@@ -1,0 +1,51 @@
+from dotenv import load_dotenv
+
+load_dotenv(".env.dev")
+
+import os
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from src.shared import database
+from src.dev import router as dev_router
+from src.iam.api import router as auth_router
+from src.iam.api.authz import router as authz_router
+from src.iam.application.event_handlers import register_handlers
+from src.iam.infrastructure.enforcer import init_enforcer
+from src.conversations.api import router as conversations_router
+from src.imports.api import router as imports_router
+from src.scopes.api import router as scopes_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await database.connect()
+    await init_enforcer(database.get_db())
+    register_handlers()
+    yield
+    await database.disconnect()
+
+
+app = FastAPI(title="DDD Backend", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+app.include_router(dev_router)
+app.include_router(auth_router)
+app.include_router(authz_router)
+app.include_router(conversations_router)
+app.include_router(imports_router)
+app.include_router(scopes_router)
+
+
+@app.get("/health")
+async def health():
+    await database.get_client().admin.command("ping")
+    return {"status": "ok"}
