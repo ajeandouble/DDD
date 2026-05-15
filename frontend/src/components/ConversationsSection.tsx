@@ -97,7 +97,13 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
   return (
     <>
       {/* Create modal */}
-      <Modal opened={createOpened} onClose={closeCreate} title="New conversation" centered size="lg">
+      <Modal
+        opened={createOpened}
+        onClose={closeCreate}
+        title="New conversation"
+        centered
+        size="lg"
+      >
         <Stack>
           <TextInput
             label="Title"
@@ -114,10 +120,14 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
             rows={4}
           />
           {createMutation.isError && (
-            <Text size="sm" c="red">{String(createMutation.error)}</Text>
+            <Text size="sm" c="red">
+              {String(createMutation.error)}
+            </Text>
           )}
           <Group justify="flex-end">
-            <Button variant="default" onClick={closeCreate}>Cancel</Button>
+            <Button variant="default" onClick={closeCreate}>
+              Cancel
+            </Button>
             <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
               Create
             </Button>
@@ -147,10 +157,14 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
             rows={4}
           />
           {updateMutation.isError && (
-            <Text size="sm" c="red">{String(updateMutation.error)}</Text>
+            <Text size="sm" c="red">
+              {String(updateMutation.error)}
+            </Text>
           )}
           <Group justify="flex-end">
-            <Button variant="default" onClick={() => setEditConv(null)}>Cancel</Button>
+            <Button variant="default" onClick={() => setEditConv(null)}>
+              Cancel
+            </Button>
             <Button onClick={() => updateMutation.mutate()} loading={updateMutation.isPending}>
               Save
             </Button>
@@ -160,24 +174,38 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
 
       <Stack gap="sm">
         <Group justify="space-between">
-          <Text fw={600} size="sm" c="dimmed">CONVERSATIONS</Text>
-          <Button size="xs" variant="light" onClick={openCreate}>New</Button>
+          <Text fw={600} size="sm" c="dimmed">
+            CONVERSATIONS
+          </Text>
+          <Button size="xs" variant="light" onClick={openCreate}>
+            New
+          </Button>
         </Group>
 
         {isLoading && <Loader size="sm" />}
         {error && <Alert color="red">{String(error)}</Alert>}
-        {data?.length === 0 && <Text size="sm" c="dimmed">No conversations yet.</Text>}
+        {data?.length === 0 && (
+          <Text size="sm" c="dimmed">
+            No conversations yet.
+          </Text>
+        )}
 
         {data?.map((conv) => (
           <Paper key={conv.id} withBorder p="sm" radius="sm">
             <Group justify="space-between" align="flex-start" wrap="nowrap">
               <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-                <Text fw={500} size="sm">{conv.title}</Text>
+                <Text fw={500} size="sm">
+                  {conv.title}
+                </Text>
                 {conv.content && (
-                  <Text size="xs" c="dimmed" lineClamp={2}>{conv.content}</Text>
+                  <Text size="xs" c="dimmed" lineClamp={2}>
+                    {conv.content}
+                  </Text>
                 )}
                 <Group gap={4} mt={4}>
-                  <Text size="xs" c="dimmed">{new Date(conv.timestamp).toLocaleDateString()}</Text>
+                  <Text size="xs" c="dimmed">
+                    {new Date(conv.timestamp).toLocaleDateString()}
+                  </Text>
                   {conv.tag_ids.length > 0 && (
                     <Badge size="xs" variant="dot" color="blue">
                       {conv.tag_ids.length} tag{conv.tag_ids.length > 1 ? "s" : ""}

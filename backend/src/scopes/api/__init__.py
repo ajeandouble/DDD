@@ -301,9 +301,7 @@ async def create_project(
     )
     try:
         project = await commands.create(
-            CreateProjectCommand(
-                name=body.name, organization_id=org_id, requesting_user_id=user.id
-            )
+            CreateProjectCommand(name=body.name, organization_id=org_id, requesting_user_id=user.id)
         )
     except ScopeNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")

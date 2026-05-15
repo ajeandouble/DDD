@@ -83,10 +83,14 @@ export function CampaignsPage() {
             data-autofocus
           />
           {createMutation.isError && (
-            <Text size="sm" c="red">{String(createMutation.error)}</Text>
+            <Text size="sm" c="red">
+              {String(createMutation.error)}
+            </Text>
           )}
           <Group justify="flex-end">
-            <Button variant="default" onClick={close}>Cancel</Button>
+            <Button variant="default" onClick={close}>
+              Cancel
+            </Button>
             <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
               Create
             </Button>
@@ -96,8 +100,12 @@ export function CampaignsPage() {
 
       <Stack gap="lg">
         <Breadcrumbs>
-          <Anchor component={Link} to="/orgs" size="sm">Organizations</Anchor>
-          <Anchor component={Link} to={`/orgs/${orgId}`} size="sm">{org?.name ?? orgId}</Anchor>
+          <Anchor component={Link} to="/orgs" size="sm">
+            Organizations
+          </Anchor>
+          <Anchor component={Link} to={`/orgs/${orgId}`} size="sm">
+            {org?.name ?? orgId}
+          </Anchor>
           <Anchor component={Link} to={`/orgs/${orgId}/projects/${projectId}`} size="sm">
             {project?.name ?? projectId}
           </Anchor>
@@ -115,12 +123,18 @@ export function CampaignsPage() {
 
         <Group justify="space-between" mt="sm">
           <Text fw={600}>Campaigns</Text>
-          <Button size="xs" onClick={open}>New campaign</Button>
+          <Button size="xs" onClick={open}>
+            New campaign
+          </Button>
         </Group>
 
         {isLoading && <Loader />}
         {error && <Alert color="red">{String(error)}</Alert>}
-        {data?.length === 0 && <Text c="dimmed" size="sm">No campaigns yet.</Text>}
+        {data?.length === 0 && (
+          <Text c="dimmed" size="sm">
+            No campaigns yet.
+          </Text>
+        )}
 
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
           {data?.map((campaign) => (

@@ -1,9 +1,13 @@
 from uuid import UUID
 
 from src.iam.domain.models import ApiKey, Group, Tag, User
-from src.iam.domain.repositories import ApiKeyRepository, GroupRepository, TagRepository, UserRepository
+from src.iam.domain.repositories import (
+    ApiKeyRepository,
+    GroupRepository,
+    TagRepository,
+    UserRepository,
+)
 from src.shared.mongo_repository import MongoRepository
-
 
 # ---------------------------------------------------------------------------
 # User
@@ -72,9 +76,7 @@ class MongoGroupRepository(MongoRepository, GroupRepository):
     collection_name = "iam_groups"
 
     async def save(self, group: Group) -> None:
-        await self._col.replace_one(
-            {"_id": str(group.id)}, _group_to_doc(group), upsert=True
-        )
+        await self._col.replace_one({"_id": str(group.id)}, _group_to_doc(group), upsert=True)
 
     async def find_by_id(self, group_id: UUID) -> Group | None:
         doc = await self._col.find_one({"_id": str(group_id)})
@@ -85,9 +87,9 @@ class MongoGroupRepository(MongoRepository, GroupRepository):
         return [_group_from_doc(d) for d in docs]
 
     async def find_by_member_in_org(self, user_id: UUID, org_id: UUID) -> list[Group]:
-        docs = await self._col.find(
-            {"org_id": str(org_id), "member_ids": str(user_id)}
-        ).to_list(length=500)
+        docs = await self._col.find({"org_id": str(org_id), "member_ids": str(user_id)}).to_list(
+            length=500
+        )
         return [_group_from_doc(d) for d in docs]
 
     async def delete(self, group_id: UUID) -> None:

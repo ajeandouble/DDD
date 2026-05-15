@@ -61,10 +61,14 @@ export function ProjectsPage() {
             data-autofocus
           />
           {createMutation.isError && (
-            <Text size="sm" c="red">{String(createMutation.error)}</Text>
+            <Text size="sm" c="red">
+              {String(createMutation.error)}
+            </Text>
           )}
           <Group justify="flex-end">
-            <Button variant="default" onClick={close}>Cancel</Button>
+            <Button variant="default" onClick={close}>
+              Cancel
+            </Button>
             <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
               Create
             </Button>
@@ -74,25 +78,30 @@ export function ProjectsPage() {
 
       <Stack gap="lg">
         <Breadcrumbs>
-          <Anchor component={Link} to="/orgs" size="sm">Organizations</Anchor>
+          <Anchor component={Link} to="/orgs" size="sm">
+            Organizations
+          </Anchor>
           <Text size="sm">{org?.name ?? orgId}</Text>
         </Breadcrumbs>
 
         <Title order={2}>{org?.name}</Title>
 
-        <ConversationsSection
-          organizationId={orgId!}
-          queryKey={["org", orgId!]}
-        />
+        <ConversationsSection organizationId={orgId!} queryKey={["org", orgId!]} />
 
         <Group justify="space-between" mt="sm">
           <Text fw={600}>Projects</Text>
-          <Button size="xs" onClick={open}>New project</Button>
+          <Button size="xs" onClick={open}>
+            New project
+          </Button>
         </Group>
 
         {isLoading && <Loader />}
         {error && <Alert color="red">{String(error)}</Alert>}
-        {data?.length === 0 && <Text c="dimmed" size="sm">No projects yet.</Text>}
+        {data?.length === 0 && (
+          <Text c="dimmed" size="sm">
+            No projects yet.
+          </Text>
+        )}
 
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
           {data?.map((project) => (

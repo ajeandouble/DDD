@@ -52,10 +52,14 @@ export function OrganizationsPage() {
             data-autofocus
           />
           {createMutation.isError && (
-            <Text size="sm" c="red">{String(createMutation.error)}</Text>
+            <Text size="sm" c="red">
+              {String(createMutation.error)}
+            </Text>
           )}
           <Group justify="flex-end">
-            <Button variant="default" onClick={close}>Cancel</Button>
+            <Button variant="default" onClick={close}>
+              Cancel
+            </Button>
             <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
               Create
             </Button>
@@ -86,7 +90,9 @@ export function OrganizationsPage() {
               style={{ cursor: "pointer" }}
               onClick={() => navigate(`/orgs/${org.id}`)}
             >
-              <Text fw={600} size="lg">{org.name}</Text>
+              <Text fw={600} size="lg">
+                {org.name}
+              </Text>
               <Text size="sm" c="dimmed" mt={4}>
                 {org.member_ids.length} member{org.member_ids.length !== 1 ? "s" : ""}
               </Text>

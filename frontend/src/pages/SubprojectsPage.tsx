@@ -67,10 +67,14 @@ export function SubprojectsPage() {
             data-autofocus
           />
           {createMutation.isError && (
-            <Text size="sm" c="red">{String(createMutation.error)}</Text>
+            <Text size="sm" c="red">
+              {String(createMutation.error)}
+            </Text>
           )}
           <Group justify="flex-end">
-            <Button variant="default" onClick={close}>Cancel</Button>
+            <Button variant="default" onClick={close}>
+              Cancel
+            </Button>
             <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
               Create
             </Button>
@@ -80,8 +84,12 @@ export function SubprojectsPage() {
 
       <Stack gap="lg">
         <Breadcrumbs>
-          <Anchor component={Link} to="/orgs" size="sm">Organizations</Anchor>
-          <Anchor component={Link} to={`/orgs/${orgId}`} size="sm">{org?.name ?? orgId}</Anchor>
+          <Anchor component={Link} to="/orgs" size="sm">
+            Organizations
+          </Anchor>
+          <Anchor component={Link} to={`/orgs/${orgId}`} size="sm">
+            {org?.name ?? orgId}
+          </Anchor>
           <Text size="sm">{project?.name ?? projectId}</Text>
         </Breadcrumbs>
 
@@ -96,12 +104,18 @@ export function SubprojectsPage() {
 
         <Group justify="space-between" mt="sm">
           <Text fw={600}>Subprojects</Text>
-          <Button size="xs" onClick={open}>New subproject</Button>
+          <Button size="xs" onClick={open}>
+            New subproject
+          </Button>
         </Group>
 
         {isLoading && <Loader />}
         {error && <Alert color="red">{String(error)}</Alert>}
-        {data?.length === 0 && <Text c="dimmed" size="sm">No subprojects yet.</Text>}
+        {data?.length === 0 && (
+          <Text c="dimmed" size="sm">
+            No subprojects yet.
+          </Text>
+        )}
 
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
           {data?.map((sp) => (

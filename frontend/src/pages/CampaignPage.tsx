@@ -41,8 +41,12 @@ export function CampaignPage() {
   return (
     <Stack gap="lg">
       <Breadcrumbs>
-        <Anchor component={Link} to="/orgs" size="sm">Organizations</Anchor>
-        <Anchor component={Link} to={`/orgs/${orgId}`} size="sm">{org?.name ?? orgId}</Anchor>
+        <Anchor component={Link} to="/orgs" size="sm">
+          Organizations
+        </Anchor>
+        <Anchor component={Link} to={`/orgs/${orgId}`} size="sm">
+          {org?.name ?? orgId}
+        </Anchor>
         <Anchor component={Link} to={`/orgs/${orgId}/projects/${projectId}`} size="sm">
           {project?.name ?? projectId}
         </Anchor>

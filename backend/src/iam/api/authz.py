@@ -136,13 +136,13 @@ def _tag_resp(t: Tag) -> TagResponse:
     )
 
 
-async def _require_manage_members(
-    org_id: UUID, user: User, authz: AuthorizationService
-) -> None:
+async def _require_manage_members(org_id: UUID, user: User, authz: AuthorizationService) -> None:
     if not await authz.can_do(
         f"user:{user.id}", "manage_members", "org", str(org_id), org_id=str(org_id)
     ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -187,9 +187,7 @@ async def list_groups(
     authz: AuthorizationService = Depends(get_authz),
     repo: MongoGroupRepository = Depends(_group_repo),
 ):
-    if not await authz.can_do(
-        f"user:{user.id}", "read", "org", str(org_id), org_id=str(org_id)
-    ):
+    if not await authz.can_do(f"user:{user.id}", "read", "org", str(org_id), org_id=str(org_id)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     return [_group_resp(g) for g in await repo.find_by_org(org_id)]
 
@@ -332,9 +330,7 @@ async def list_tags(
     authz: AuthorizationService = Depends(get_authz),
     repo: MongoTagRepository = Depends(_tag_repo),
 ):
-    if not await authz.can_do(
-        f"user:{user.id}", "read", "org", str(org_id), org_id=str(org_id)
-    ):
+    if not await authz.can_do(f"user:{user.id}", "read", "org", str(org_id), org_id=str(org_id)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     return [_tag_resp(t) for t in await repo.find_by_org(org_id)]
 
@@ -351,18 +347,14 @@ async def create_tag(
     authz: AuthorizationService = Depends(get_authz),
     repo: MongoTagRepository = Depends(_tag_repo),
 ):
-    if not await authz.can_do(
-        f"user:{user.id}", "write", "org", str(org_id), org_id=str(org_id)
-    ):
+    if not await authz.can_do(f"user:{user.id}", "write", "org", str(org_id), org_id=str(org_id)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     tag = Tag.create(name=body.name, org_id=org_id)
     await repo.save(tag)
     return _tag_resp(tag)
 
 
-@router.delete(
-    "/organizations/{org_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/organizations/{org_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_tag(
     org_id: UUID,
     tag_id: UUID,
@@ -370,9 +362,7 @@ async def delete_tag(
     authz: AuthorizationService = Depends(get_authz),
     repo: MongoTagRepository = Depends(_tag_repo),
 ):
-    if not await authz.can_do(
-        f"user:{user.id}", "delete", "org", str(org_id), org_id=str(org_id)
-    ):
+    if not await authz.can_do(f"user:{user.id}", "delete", "org", str(org_id), org_id=str(org_id)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     tag = await repo.find_by_id(tag_id)
     if tag is None or tag.org_id != org_id:

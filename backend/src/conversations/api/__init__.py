@@ -127,7 +127,9 @@ async def _require_write(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     org_id = str(c.organization_id) if c.organization_id else None
     if not await authz.can_do(f"user:{user.id}", "write", scope[0], scope[1], org_id=org_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
 
 
 # --- Queries ---

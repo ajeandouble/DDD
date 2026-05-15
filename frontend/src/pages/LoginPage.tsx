@@ -85,7 +85,12 @@ export function LoginPage() {
 
         <div className={styles.toggle}>
           {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
-          <button onClick={() => { setMode(mode === "login" ? "register" : "login"); mutation.reset(); }}>
+          <button
+            onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              mutation.reset();
+            }}
+          >
             {mode === "login" ? "Register" : "Sign in"}
           </button>
         </div>

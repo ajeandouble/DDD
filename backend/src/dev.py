@@ -75,20 +75,14 @@ async def seed():
     if existing is not None:
         org = await db["scopes_organizations"].find_one({"owner_id": str(existing.id)})
         if org:
-            project = await db["scopes_projects"].find_one(
-                {"organization_id": str(org["_id"])}
-            )
+            project = await db["scopes_projects"].find_one({"organization_id": str(org["_id"])})
             subproject = (
-                await db["scopes_subprojects"].find_one(
-                    {"project_id": str(project["_id"])}
-                )
+                await db["scopes_subprojects"].find_one({"project_id": str(project["_id"])})
                 if project
                 else None
             )
             campaign = (
-                await db["scopes_campaigns"].find_one(
-                    {"subproject_id": str(subproject["_id"])}
-                )
+                await db["scopes_campaigns"].find_one({"subproject_id": str(subproject["_id"])})
                 if subproject
                 else None
             )
@@ -109,10 +103,7 @@ async def seed():
         except AuthError:
             pass  # already exists
 
-    users = {
-        email: await user_repo.find_by_email(email)
-        for email, _, _ in _USERS
-    }
+    users = {email: await user_repo.find_by_email(email) for email, _, _ in _USERS}
     superadmin_user = users["superadmin@ddd.dev"]
     alice = users["alice@ddd.dev"]
     bob = users["bob@ddd.dev"]

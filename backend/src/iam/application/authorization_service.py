@@ -65,9 +65,7 @@ class AuthorizationService:
     # Role assignment
     # -----------------------------------------------------------------
 
-    async def assign_role(
-        self, subject: str, role: str, scope_type: str, scope_id: str
-    ) -> None:
+    async def assign_role(self, subject: str, role: str, scope_type: str, scope_id: str) -> None:
         domain = f"{scope_type}:{scope_id}"
         self._e.add_grouping_policy(subject, role, domain)
         await self._save_g_rule(subject, role, domain)
@@ -116,9 +114,7 @@ class AuthorizationService:
 
     async def _save_g_rule(self, *parts: str) -> None:
         rule = list(parts)
-        await self._col.update_one(
-            {"rule": rule}, {"$setOnInsert": {"rule": rule}}, upsert=True
-        )
+        await self._col.update_one({"rule": rule}, {"$setOnInsert": {"rule": rule}}, upsert=True)
 
     async def _delete_g_rule(self, *parts: str) -> None:
         await self._col.delete_one({"rule": list(parts)})

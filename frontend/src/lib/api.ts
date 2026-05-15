@@ -15,9 +15,10 @@ export const getConversations = (params?: {
   scope_type?: string;
 }): Promise<ConversationResponse[]> => {
   const searchParams = params
-    ? (Object.fromEntries(
-        Object.entries(params).filter(([, v]) => v != null)
-      ) as Record<string, string>)
+    ? (Object.fromEntries(Object.entries(params).filter(([, v]) => v != null)) as Record<
+        string,
+        string
+      >)
     : undefined;
   return api.get("conversations/", { headers: authHeaders(), searchParams }).json();
 };

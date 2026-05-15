@@ -9,7 +9,6 @@ from src.scopes.domain.repositories import (
 )
 from src.shared.mongo_repository import MongoRepository
 
-
 # --- Organization ---
 
 

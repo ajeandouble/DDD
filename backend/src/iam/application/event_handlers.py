@@ -26,9 +26,7 @@ async def _on_project_created(event: ProjectCreated) -> None:
 
 
 async def _on_subproject_created(event: SubprojectCreated) -> None:
-    await _authz().register_lineage(
-        "subproject", event.subproject_id, "project", event.project_id
-    )
+    await _authz().register_lineage("subproject", event.subproject_id, "project", event.project_id)
 
 
 async def _on_campaign_created(event: CampaignCreated) -> None:
