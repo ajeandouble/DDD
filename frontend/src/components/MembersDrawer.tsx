@@ -230,7 +230,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
 
   const bulkRemoveMemberMutation = useMutation({
     mutationFn: async ({ gid, memberIds }: { gid: string; memberIds: string[] }) => {
-      for (const mid of memberIds) {
+      for (const mid of memberIds.filter((id) => id !== me?.id)) {
         await removeGroupMember(orgId, gid, mid);
       }
     },
@@ -480,34 +480,43 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                     </Button>
                   </Group>
                 )}
-                {g.member_ids.map((mid) => (
-                  <Group key={mid} justify="space-between" wrap="nowrap">
-                    <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
-                      <Checkbox
-                        size="xs"
-                        checked={groupMemberSelected[g.id]?.has(mid) ?? false}
-                        onChange={() => {
-                          const current = new Set(groupMemberSelected[g.id] ?? []);
-                          if (current.has(mid)) current.delete(mid);
-                          else current.add(mid);
-                          setGroupMemberSelected((prev) => ({ ...prev, [g.id]: current }));
-                        }}
-                      />
-                      <Text size="xs" truncate>
-                        {userById[mid] ?? mid}
-                      </Text>
+                {g.member_ids.map((mid) => {
+                  const isSelf = mid === me?.id;
+                  return (
+                    <Group key={mid} justify="space-between" wrap="nowrap" opacity={isSelf ? 0.5 : 1}>
+                      <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+                        <Checkbox
+                          size="xs"
+                          disabled={isSelf}
+                          checked={groupMemberSelected[g.id]?.has(mid) ?? false}
+                          onChange={() => {
+                            const current = new Set(groupMemberSelected[g.id] ?? []);
+                            if (current.has(mid)) current.delete(mid);
+                            else current.add(mid);
+                            setGroupMemberSelected((prev) => ({ ...prev, [g.id]: current }));
+                          }}
+                        />
+                        <Text size="xs" truncate>
+                          {userById[mid] ?? mid}
+                          {isSelf && (
+                            <Text component="span" size="xs" c="dimmed"> (you)</Text>
+                          )}
+                        </Text>
+                      </Group>
+                      <Button
+                        size="compact-xs"
+                        variant="subtle"
+                        color="red"
+                        loading={removeMemberMutation.isPending}
+                        disabled={isSelf}
+                        title={isSelf ? "Cannot remove yourself from a group" : undefined}
+                        onClick={() => removeMemberMutation.mutate({ gid: g.id, memberId: mid })}
+                      >
+                        ×
+                      </Button>
                     </Group>
-                    <Button
-                      size="compact-xs"
-                      variant="subtle"
-                      color="red"
-                      loading={removeMemberMutation.isPending}
-                      onClick={() => removeMemberMutation.mutate({ gid: g.id, memberId: mid })}
-                    >
-                      ×
-                    </Button>
-                  </Group>
-                ))}
+                  );
+                })}
                 <Group gap="xs" mt={4}>
                   <Autocomplete
                     placeholder="Add by email"
