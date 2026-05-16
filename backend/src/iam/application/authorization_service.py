@@ -10,6 +10,14 @@ class NotAuthorized(Exception):
     pass
 
 
+_ROLE_RANK: dict[str, int] = {
+    "viewer": 0,
+    "editor": 1,
+    "supervisor": 2,
+    "admin": 3,
+}
+
+
 class AuthorizationService:
     def __init__(
         self,
@@ -60,6 +68,63 @@ class AuthorizationService:
             domain = parents[0] if parents else None
 
         return False
+
+    # -----------------------------------------------------------------
+    # Delegation check — "can granter assign/revoke this role at this scope?"
+    # -----------------------------------------------------------------
+
+    async def can_assign(
+        self,
+        granter: str,
+        role: str,
+        scope_type: str,
+        scope_id: str,
+        org_id: str | None = None,
+    ) -> bool:
+        # Superadmin can assign any role anywhere
+        if "superadmin" in self._e.get_roles_for_user_in_domain(granter, "platform"):
+            return True
+        # Must have manage_members at the target scope (or a parent)
+        if not await self.can_do(granter, "manage_members", scope_type, scope_id, org_id=org_id):
+            return False
+        # Role ceiling: granter can only grant roles they themselves hold or below
+        granter_role = await self._highest_role(granter, scope_type, scope_id, org_id)
+        if granter_role is None:
+            return False
+        return _ROLE_RANK.get(role, -1) <= _ROLE_RANK[granter_role]
+
+    async def _highest_role(
+        self,
+        subject: str,
+        scope_type: str,
+        scope_id: str,
+        org_id: str | None = None,
+    ) -> str | None:
+        """Return the highest-ranked role subject holds at scope_type:scope_id or any ancestor."""
+        subjects = [subject]
+        if subject.startswith("user:") and org_id:
+            try:
+                uid = UUID(subject[5:])
+                groups = await self._groups.find_by_member_in_org(uid, UUID(org_id))
+                subjects.extend(f"group:{g.id}" for g in groups)
+            except (ValueError, AttributeError):
+                pass
+
+        best = -1
+        domain: str | None = f"{scope_type}:{scope_id}"
+        visited: set[str] = set()
+
+        while domain and domain not in visited:
+            visited.add(domain)
+            for sub in subjects:
+                for r in self._e.get_roles_for_user_in_domain(sub, domain):
+                    best = max(best, _ROLE_RANK.get(r, -1))
+            parents = self._e.get_roles_for_user_in_domain(domain, "_lineage")
+            domain = parents[0] if parents else None
+
+        if best < 0:
+            return None
+        return next(r for r, rank in _ROLE_RANK.items() if rank == best)
 
     # -----------------------------------------------------------------
     # Role assignment

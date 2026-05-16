@@ -157,7 +157,10 @@ async def assign_role(
     user: User = Depends(get_current_user),
     authz: AuthorizationService = Depends(get_authz),
 ):
-    await _require_manage_members(org_id, user, authz)
+    if not await authz.can_assign(
+        f"user:{user.id}", body.role, body.scope_type, str(body.scope_id), org_id=str(org_id)
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
     await authz.assign_role(body.subject, body.role, body.scope_type, str(body.scope_id))
 
 
@@ -168,7 +171,10 @@ async def revoke_role(
     user: User = Depends(get_current_user),
     authz: AuthorizationService = Depends(get_authz),
 ):
-    await _require_manage_members(org_id, user, authz)
+    if not await authz.can_assign(
+        f"user:{user.id}", body.role, body.scope_type, str(body.scope_id), org_id=str(org_id)
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
     try:
         await authz.revoke_role(body.subject, body.role, body.scope_type, str(body.scope_id))
     except NotAuthorized as e:
@@ -288,6 +294,13 @@ async def create_api_key(
     await repo.save(api_key)
 
     if body.scope_type and body.scope_id and body.role:
+        if not await authz.can_assign(
+            f"user:{user.id}", body.role, body.scope_type, str(body.scope_id)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot issue an API key with a role exceeding your own",
+            )
         await authz.assign_role(
             f"apikey:{api_key.id}", body.role, body.scope_type, str(body.scope_id)
         )
