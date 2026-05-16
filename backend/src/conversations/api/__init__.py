@@ -14,14 +14,14 @@ from src.conversations.domain.models import Conversation, ScopeType
 from src.conversations.domain.repositories import ConversationRepository
 from src.conversations.infrastructure.repositories import MongoConversationRepository
 from src.iam.application.authorization_service import AuthorizationService
-from src.iam.domain.models import User
+from src.iam.domain.models import Principal, User
 from src.shared.database import get_db
-from src.shared.deps import get_authz, get_current_user
+from src.shared.deps import get_authz, get_current_principal, get_current_user, principal_subject
 
 router = APIRouter(
     prefix="/conversations",
     tags=["conversations"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(get_current_principal)],
 )
 
 
@@ -117,16 +117,17 @@ def _casbin_scope(c: Conversation) -> tuple[str, str] | None:
 
 async def _require_write(
     c: Conversation,
-    user: User,
+    principal: Principal,
     authz: AuthorizationService,
 ) -> None:
-    if c.created_by == user.id:
+    if isinstance(principal, User) and c.created_by == principal.id:
         return
     scope = _casbin_scope(c)
     if scope is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     org_id = str(c.organization_id) if c.organization_id else None
-    if not await authz.can_do(f"user:{user.id}", "write", scope[0], scope[1], org_id=org_id):
+    subj = principal_subject(principal)
+    if not await authz.can_do(subj, "write", scope[0], scope[1], org_id=org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
         )
@@ -170,13 +171,14 @@ async def get_conversation(
 async def create_conversation(
     body: ConversationCreate,
     commands: ConversationCommandHandler = Depends(_commands),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_current_principal),
 ):
+    owner_id = principal.id if isinstance(principal, User) else principal.owner_id
     c = await commands.create(
         CreateConversationCommand(
             title=body.title,
             content=body.content,
-            created_by=user.id,
+            created_by=owner_id,
             metadata=[(e.key, e.value) for e in body.metadata],
             emit_webhook=body.emit_webhook,
             organization_id=body.organization_id,
@@ -194,13 +196,13 @@ async def update_conversation(
     body: ConversationUpdate,
     commands: ConversationCommandHandler = Depends(_commands),
     queries: ConversationQueryHandler = Depends(_queries),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_current_principal),
     authz: AuthorizationService = Depends(get_authz),
 ):
     c = await queries.get_by_id(conversation_id)
     if c is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
-    await _require_write(c, user, authz)
+    await _require_write(c, principal, authz)
     try:
         updated = await commands.update(
             UpdateConversationCommand(
@@ -223,13 +225,13 @@ async def delete_conversation(
     conversation_id: UUID,
     commands: ConversationCommandHandler = Depends(_commands),
     queries: ConversationQueryHandler = Depends(_queries),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_current_principal),
     authz: AuthorizationService = Depends(get_authz),
 ):
     c = await queries.get_by_id(conversation_id)
     if c is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
-    await _require_write(c, user, authz)
+    await _require_write(c, principal, authz)
     try:
         await commands.delete(conversation_id)
     except ConversationNotFound:

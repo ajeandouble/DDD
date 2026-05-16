@@ -9,6 +9,7 @@ _POOL_CONFIG = {
     "maxIdleTimeMS": 30_000,
     "serverSelectionTimeoutMS": 5_000,
     "connectTimeoutMS": 5_000,
+    "uuidRepresentation": "standard",
 }
 
 

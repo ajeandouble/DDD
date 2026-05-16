@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from src.iam.application.authorization_service import AuthorizationService
-from src.iam.domain.models import User
+from src.iam.domain.models import Principal, User
 from src.scopes.application.commands import (
     AddMemberCommand,
     CampaignCommandHandler,
@@ -38,9 +38,9 @@ from src.scopes.infrastructure.repositories import (
     MongoSubprojectRepository,
 )
 from src.shared.database import get_db
-from src.shared.deps import get_authz, get_current_user
+from src.shared.deps import get_authz, get_current_principal, get_current_user, principal_subject
 
-router = APIRouter(prefix="/scopes", tags=["scopes"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/scopes", tags=["scopes"], dependencies=[Depends(get_current_principal)])
 
 
 # --- Dependency factories ---
@@ -217,9 +217,10 @@ async def _require(
 @router.get("/organizations/", response_model=list[OrgResponse])
 async def list_organizations(
     queries: OrganizationQueryHandler = Depends(_org_queries),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_current_principal),
 ):
-    return [_org_resp(o) for o in await queries.list_for_member(user.id)]
+    owner_id = principal.id if isinstance(principal, User) else principal.owner_id
+    return [_org_resp(o) for o in await queries.list_for_member(owner_id)]
 
 
 @router.post("/organizations/", response_model=OrgResponse, status_code=status.HTTP_201_CREATED)
@@ -236,10 +237,11 @@ async def create_organization(
 async def get_organization(
     org_id: UUID,
     queries: OrganizationQueryHandler = Depends(_org_queries),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_current_principal),
 ):
     org = await queries.get_by_id(org_id)
-    if org is None or not org.is_member(user.id):
+    owner_id = principal.id if isinstance(principal, User) else principal.owner_id
+    if org is None or not org.is_member(owner_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
     return _org_resp(org)
 
@@ -249,17 +251,15 @@ async def add_member(
     org_id: UUID,
     body: AddMemberBody,
     commands: OrganizationCommandHandler = Depends(_org_commands),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_current_principal),
     authz: AuthorizationService = Depends(get_authz),
 ):
-    await _require(
-        await authz.can_do(
-            f"user:{user.id}", "manage_members", "org", str(org_id), org_id=str(org_id)
-        )
-    )
+    subj = principal_subject(principal)
+    owner_id = principal.id if isinstance(principal, User) else principal.owner_id
+    await _require(await authz.can_do(subj, "manage_members", "org", str(org_id), org_id=str(org_id)))
     try:
         org = await commands.add_member(
-            AddMemberCommand(org_id=org_id, user_id=body.user_id, requesting_user_id=user.id)
+            AddMemberCommand(org_id=org_id, user_id=body.user_id, requesting_user_id=owner_id)
         )
     except ScopeNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
@@ -276,10 +276,11 @@ async def list_projects(
     org_id: UUID,
     queries: ProjectQueryHandler = Depends(_project_queries),
     org_queries: OrganizationQueryHandler = Depends(_org_queries),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_current_principal),
 ):
     org = await org_queries.get_by_id(org_id)
-    if org is None or not org.is_member(user.id):
+    owner_id = principal.id if isinstance(principal, User) else principal.owner_id
+    if org is None or not org.is_member(owner_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
     return [_project_resp(p) for p in await queries.list_by_org(org_id)]
 
@@ -293,15 +294,15 @@ async def create_project(
     org_id: UUID,
     body: ProjectCreate,
     commands: ProjectCommandHandler = Depends(_project_commands),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_current_principal),
     authz: AuthorizationService = Depends(get_authz),
 ):
-    await _require(
-        await authz.can_do(f"user:{user.id}", "write", "org", str(org_id), org_id=str(org_id))
-    )
+    subj = principal_subject(principal)
+    owner_id = principal.id if isinstance(principal, User) else principal.owner_id
+    await _require(await authz.can_do(subj, "write", "org", str(org_id), org_id=str(org_id)))
     try:
         project = await commands.create(
-            CreateProjectCommand(name=body.name, organization_id=org_id, requesting_user_id=user.id)
+            CreateProjectCommand(name=body.name, organization_id=org_id, requesting_user_id=owner_id)
         )
     except ScopeNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
@@ -342,20 +343,16 @@ async def create_subproject(
     body: SubprojectCreate,
     commands: SubprojectCommandHandler = Depends(_subproject_commands),
     project_queries: ProjectQueryHandler = Depends(_project_queries),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_current_principal),
     authz: AuthorizationService = Depends(get_authz),
 ):
     project = await project_queries.get_by_id(project_id)
     if project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    subj = principal_subject(principal)
+    owner_id = principal.id if isinstance(principal, User) else principal.owner_id
     await _require(
-        await authz.can_do(
-            f"user:{user.id}",
-            "write",
-            "project",
-            str(project_id),
-            org_id=str(project.organization_id),
-        )
+        await authz.can_do(subj, "write", "project", str(project_id), org_id=str(project.organization_id))
     )
     try:
         sp = await commands.create(
@@ -363,7 +360,7 @@ async def create_subproject(
                 name=body.name,
                 project_id=project_id,
                 org_id=project.organization_id,
-                requesting_user_id=user.id,
+                requesting_user_id=owner_id,
             )
         )
     except ScopeNotFound:
@@ -406,7 +403,7 @@ async def create_campaign(
     commands: CampaignCommandHandler = Depends(_campaign_commands),
     subproject_queries: SubprojectQueryHandler = Depends(_subproject_queries),
     project_queries: ProjectQueryHandler = Depends(_project_queries),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_current_principal),
     authz: AuthorizationService = Depends(get_authz),
 ):
     sp = await subproject_queries.get_by_id(subproject_id)
@@ -415,14 +412,10 @@ async def create_campaign(
     project = await project_queries.get_by_id(sp.project_id)
     if project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    subj = principal_subject(principal)
+    owner_id = principal.id if isinstance(principal, User) else principal.owner_id
     await _require(
-        await authz.can_do(
-            f"user:{user.id}",
-            "write",
-            "subproject",
-            str(subproject_id),
-            org_id=str(project.organization_id),
-        )
+        await authz.can_do(subj, "write", "subproject", str(subproject_id), org_id=str(project.organization_id))
     )
     try:
         c = await commands.create(
@@ -430,7 +423,7 @@ async def create_campaign(
                 name=body.name,
                 subproject_id=subproject_id,
                 org_id=project.organization_id,
-                requesting_user_id=user.id,
+                requesting_user_id=owner_id,
             )
         )
     except ScopeNotFound:

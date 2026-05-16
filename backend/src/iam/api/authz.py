@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from src.iam.application.authorization_service import AuthorizationService, NotAuthorized
@@ -100,6 +100,18 @@ class TagResponse(BaseModel):
     created_at: str
 
 
+class UserSummaryResponse(BaseModel):
+    id: UUID
+    email: str
+
+
+class RoleAssignmentResponse(BaseModel):
+    subject: str
+    role: str
+    scope_type: str
+    scope_id: str
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -171,6 +183,8 @@ async def revoke_role(
     user: User = Depends(get_current_user),
     authz: AuthorizationService = Depends(get_authz),
 ):
+    if body.subject == f"user:{user.id}":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot revoke your own role")
     if not await authz.can_assign(
         f"user:{user.id}", body.role, body.scope_type, str(body.scope_id), org_id=str(org_id)
     ):
@@ -285,6 +299,18 @@ async def create_api_key(
     authz: AuthorizationService = Depends(get_authz),
     repo: MongoApiKeyRepository = Depends(_apikey_repo),
 ):
+    db = get_db()
+    subject = f"user:{user.id}"
+    # Require supervisor+ in at least one org
+    rule = await db["casbin_rules"].find_one(
+        {"rule.0": subject, "rule.1": {"$in": ["supervisor", "admin"]}}
+    )
+    if rule is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires supervisor or admin role in at least one organization",
+        )
+
     api_key, raw_key = ApiKey.create(
         name=body.name,
         owner_id=user.id,
@@ -329,6 +355,123 @@ async def delete_api_key(
     if key is None or key.owner_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     await repo.delete(key_id)
+
+
+# ---------------------------------------------------------------------------
+# Users (read-only listing for role assignment UI)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/users", response_model=list[UserSummaryResponse])
+async def list_users(user: User = Depends(get_current_user)):
+    db = get_db()
+    return [
+        UserSummaryResponse(id=doc["_id"], email=doc["email"])
+        async for doc in db["iam_users"].find({}, {"_id": 1, "email": 1})
+    ]
+
+
+@router.get("/organizations/{org_id}/roles", response_model=list[RoleAssignmentResponse])
+async def list_role_assignments(
+    org_id: UUID,
+    scope_type: str | None = Query(None),
+    scope_id: UUID | None = Query(None),
+    user: User = Depends(get_current_user),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    if not await authz.can_do(f"user:{user.id}", "read", "org", str(org_id), org_id=str(org_id)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+
+    db = get_db()
+
+    if scope_type and scope_id:
+        domains = [f"{scope_type}:{scope_id}"]
+    else:
+        # Collect all scope domains belonging to this org
+        domains = [f"org:{org_id}"]
+        project_ids = [
+            doc["_id"]
+            async for doc in db["projects"].find({"organization_id": org_id}, {"_id": 1})
+        ]
+        domains.extend(f"project:{pid}" for pid in project_ids)
+        subproject_ids = []
+        for pid in project_ids:
+            async for doc in db["subprojects"].find({"project_id": pid}, {"_id": 1}):
+                subproject_ids.append(doc["_id"])
+        domains.extend(f"subproject:{sid}" for sid in subproject_ids)
+        for sid in subproject_ids:
+            async for doc in db["campaigns"].find({"subproject_id": sid}, {"_id": 1}):
+                domains.append(f"campaign:{doc['_id']}")
+
+    results = []
+    async for doc in db["casbin_rules"].find({"rule.2": {"$in": domains}}):
+        rule = doc["rule"]
+        if len(rule) == 3:
+            domain = rule[2]
+            sep = domain.find(":")
+            if sep > 0:
+                results.append(
+                    RoleAssignmentResponse(
+                        subject=rule[0],
+                        role=rule[1],
+                        scope_type=domain[:sep],
+                        scope_id=domain[sep + 1 :],
+                    )
+                )
+    return results
+
+
+# ---------------------------------------------------------------------------
+# My roles — effective role at every scope in an org (for UX gating)
+# ---------------------------------------------------------------------------
+
+
+class MyRolesResponse(BaseModel):
+    org: str | None
+    projects: dict[str, str | None]
+    subprojects: dict[str, str | None]
+    campaigns: dict[str, str | None]
+
+
+@router.get("/organizations/{org_id}/my-roles", response_model=MyRolesResponse)
+async def my_roles(
+    org_id: UUID,
+    user: User = Depends(get_current_user),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    db = get_db()
+    subject = f"user:{user.id}"
+    oid = str(org_id)
+
+    org_role = await authz.effective_role(subject, "org", oid, org_id=oid)
+
+    project_ids = [doc["_id"] async for doc in db["projects"].find({"organization_id": org_id}, {"_id": 1})]
+    project_roles = {
+        str(pid): await authz.effective_role(subject, "project", str(pid), org_id=oid)
+        for pid in project_ids
+    }
+
+    subproject_ids = []
+    for pid in project_ids:
+        async for doc in db["subprojects"].find({"project_id": pid}, {"_id": 1}):
+            subproject_ids.append(doc["_id"])
+    subproject_roles = {
+        str(sid): await authz.effective_role(subject, "subproject", str(sid), org_id=oid)
+        for sid in subproject_ids
+    }
+
+    campaign_roles: dict[str, str | None] = {}
+    for sid in subproject_ids:
+        async for doc in db["campaigns"].find({"subproject_id": sid}, {"_id": 1}):
+            cid = doc["_id"]
+            campaign_roles[str(cid)] = await authz.effective_role(subject, "campaign", str(cid), org_id=oid)
+
+    return MyRolesResponse(
+        org=org_role,
+        projects=project_roles,
+        subprojects=subproject_roles,
+        campaigns=campaign_roles,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -77,7 +77,7 @@ async def init_enforcer(db: AsyncIOMotorDatabase) -> casbin.Enforcer:
 
 async def _migrate_org_owners(db: AsyncIOMotorDatabase, e: casbin.Enforcer) -> None:
     col = db["casbin_rules"]
-    async for org in db["scopes_organizations"].find({}, {"_id": 1, "owner_id": 1}):
+    async for org in db["organizations"].find({}, {"_id": 1, "owner_id": 1}):
         org_id = org["_id"]
         owner_id = org["owner_id"]
         sub = f"user:{owner_id}"

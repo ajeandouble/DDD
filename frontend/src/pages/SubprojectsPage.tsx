@@ -19,12 +19,16 @@ import {
 import { useDisclosure } from "@mantine/hooks";
 import { getOrganization, getProject, getSubprojects, createSubproject } from "../lib/api";
 import { ConversationsSection } from "../components/ConversationsSection";
+import { MembersDrawer } from "../components/MembersDrawer";
+import { useCanManageMembers } from "../hooks/useMyRoles";
 
 export function SubprojectsPage() {
   const { orgId, projectId } = useParams<{ orgId: string; projectId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [opened, { open, close }] = useDisclosure(false);
+  const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
+  const canManageMembers = useCanManageMembers(orgId, "project", projectId);
   const [name, setName] = useState("");
 
   const { data: org } = useQuery({
@@ -93,7 +97,22 @@ export function SubprojectsPage() {
           <Text size="sm">{project?.name ?? projectId}</Text>
         </Breadcrumbs>
 
-        <Title order={2}>{project?.name}</Title>
+        <Group justify="space-between">
+          <Title order={2}>{project?.name}</Title>
+          {canManageMembers && (
+            <Button size="xs" variant="light" onClick={openMembers}>
+              Members
+            </Button>
+          )}
+        </Group>
+
+        <MembersDrawer
+          orgId={orgId!}
+          scopeType="project"
+          scopeId={projectId!}
+          opened={membersOpened}
+          onClose={closeMembers}
+        />
 
         <ConversationsSection
           organizationId={orgId!}

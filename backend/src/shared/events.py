@@ -11,5 +11,8 @@ def subscribe(event_type: type, handler: Handler) -> None:
 
 
 async def publish(event: Any) -> None:
-    for handler in _registry[type(event)]:
+    handlers = _registry[type(event)]
+    print(f"[bus] publish {type(event).__name__} → {len(handlers)} handler(s)  {event}")
+    for handler in handlers:
+        print(f"[bus]   → {handler.__module__}.{handler.__name__}")
         await handler(event)

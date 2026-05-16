@@ -14,20 +14,20 @@ from src.shared.mongo_repository import MongoRepository
 
 def _org_to_doc(org: Organization) -> dict:
     return {
-        "_id": str(org.id),
+        "_id": org.id,
         "name": org.name,
-        "owner_id": str(org.owner_id),
-        "member_ids": [str(m) for m in org.member_ids],
+        "owner_id": org.owner_id,
+        "member_ids": list(org.member_ids),
         "created_at": org.created_at,
     }
 
 
 def _org_from_doc(doc: dict) -> Organization:
     return Organization(
-        id=UUID(doc["_id"]),
+        id=doc["_id"],
         name=doc["name"],
-        owner_id=UUID(doc["owner_id"]),
-        member_ids=[UUID(m) for m in doc.get("member_ids", [])],
+        owner_id=doc["owner_id"],
+        member_ids=list(doc.get("member_ids", [])),
         created_at=doc["created_at"],
     )
 
@@ -39,20 +39,20 @@ class MongoOrganizationRepository(MongoRepository, OrganizationRepository):
         await self._col.insert_one(_org_to_doc(org))
 
     async def find_by_id(self, org_id: UUID) -> Organization | None:
-        doc = await self._col.find_one({"_id": str(org_id)})
+        doc = await self._col.find_one({"_id": org_id})
         return _org_from_doc(doc) if doc else None
 
     async def find_by_member(self, user_id: UUID) -> list[Organization]:
-        docs = await self._col.find({"member_ids": str(user_id)}).to_list(length=100)
+        docs = await self._col.find({"member_ids": user_id}).to_list(length=100)
         return [_org_from_doc(d) for d in docs]
 
     async def update(self, org: Organization) -> None:
         doc = _org_to_doc(org)
         doc.pop("_id")
-        await self._col.update_one({"_id": str(org.id)}, {"$set": doc})
+        await self._col.update_one({"_id": org.id}, {"$set": doc})
 
     async def delete(self, org_id: UUID) -> None:
-        await self._col.delete_one({"_id": str(org_id)})
+        await self._col.delete_one({"_id": org_id})
 
 
 # --- Project ---
@@ -60,18 +60,18 @@ class MongoOrganizationRepository(MongoRepository, OrganizationRepository):
 
 def _project_to_doc(p: Project) -> dict:
     return {
-        "_id": str(p.id),
+        "_id": p.id,
         "name": p.name,
-        "organization_id": str(p.organization_id),
+        "organization_id": p.organization_id,
         "created_at": p.created_at,
     }
 
 
 def _project_from_doc(doc: dict) -> Project:
     return Project(
-        id=UUID(doc["_id"]),
+        id=doc["_id"],
         name=doc["name"],
-        organization_id=UUID(doc["organization_id"]),
+        organization_id=doc["organization_id"],
         created_at=doc["created_at"],
     )
 
@@ -83,20 +83,20 @@ class MongoProjectRepository(MongoRepository, ProjectRepository):
         await self._col.insert_one(_project_to_doc(project))
 
     async def find_by_id(self, project_id: UUID) -> Project | None:
-        doc = await self._col.find_one({"_id": str(project_id)})
+        doc = await self._col.find_one({"_id": project_id})
         return _project_from_doc(doc) if doc else None
 
     async def find_by_organization(self, org_id: UUID) -> list[Project]:
-        docs = await self._col.find({"organization_id": str(org_id)}).to_list(length=100)
+        docs = await self._col.find({"organization_id": org_id}).to_list(length=100)
         return [_project_from_doc(d) for d in docs]
 
     async def update(self, project: Project) -> None:
         doc = _project_to_doc(project)
         doc.pop("_id")
-        await self._col.update_one({"_id": str(project.id)}, {"$set": doc})
+        await self._col.update_one({"_id": project.id}, {"$set": doc})
 
     async def delete(self, project_id: UUID) -> None:
-        await self._col.delete_one({"_id": str(project_id)})
+        await self._col.delete_one({"_id": project_id})
 
 
 # --- Subproject ---
@@ -104,18 +104,18 @@ class MongoProjectRepository(MongoRepository, ProjectRepository):
 
 def _subproject_to_doc(sp: Subproject) -> dict:
     return {
-        "_id": str(sp.id),
+        "_id": sp.id,
         "name": sp.name,
-        "project_id": str(sp.project_id),
+        "project_id": sp.project_id,
         "created_at": sp.created_at,
     }
 
 
 def _subproject_from_doc(doc: dict) -> Subproject:
     return Subproject(
-        id=UUID(doc["_id"]),
+        id=doc["_id"],
         name=doc["name"],
-        project_id=UUID(doc["project_id"]),
+        project_id=doc["project_id"],
         created_at=doc["created_at"],
     )
 
@@ -127,20 +127,20 @@ class MongoSubprojectRepository(MongoRepository, SubprojectRepository):
         await self._col.insert_one(_subproject_to_doc(subproject))
 
     async def find_by_id(self, subproject_id: UUID) -> Subproject | None:
-        doc = await self._col.find_one({"_id": str(subproject_id)})
+        doc = await self._col.find_one({"_id": subproject_id})
         return _subproject_from_doc(doc) if doc else None
 
     async def find_by_project(self, project_id: UUID) -> list[Subproject]:
-        docs = await self._col.find({"project_id": str(project_id)}).to_list(length=100)
+        docs = await self._col.find({"project_id": project_id}).to_list(length=100)
         return [_subproject_from_doc(d) for d in docs]
 
     async def update(self, subproject: Subproject) -> None:
         doc = _subproject_to_doc(subproject)
         doc.pop("_id")
-        await self._col.update_one({"_id": str(subproject.id)}, {"$set": doc})
+        await self._col.update_one({"_id": subproject.id}, {"$set": doc})
 
     async def delete(self, subproject_id: UUID) -> None:
-        await self._col.delete_one({"_id": str(subproject_id)})
+        await self._col.delete_one({"_id": subproject_id})
 
 
 # --- Campaign ---
@@ -148,18 +148,18 @@ class MongoSubprojectRepository(MongoRepository, SubprojectRepository):
 
 def _campaign_to_doc(c: Campaign) -> dict:
     return {
-        "_id": str(c.id),
+        "_id": c.id,
         "name": c.name,
-        "subproject_id": str(c.subproject_id),
+        "subproject_id": c.subproject_id,
         "created_at": c.created_at,
     }
 
 
 def _campaign_from_doc(doc: dict) -> Campaign:
     return Campaign(
-        id=UUID(doc["_id"]),
+        id=doc["_id"],
         name=doc["name"],
-        subproject_id=UUID(doc["subproject_id"]),
+        subproject_id=doc["subproject_id"],
         created_at=doc["created_at"],
     )
 
@@ -171,17 +171,17 @@ class MongoCampaignRepository(MongoRepository, CampaignRepository):
         await self._col.insert_one(_campaign_to_doc(campaign))
 
     async def find_by_id(self, campaign_id: UUID) -> Campaign | None:
-        doc = await self._col.find_one({"_id": str(campaign_id)})
+        doc = await self._col.find_one({"_id": campaign_id})
         return _campaign_from_doc(doc) if doc else None
 
     async def find_by_subproject(self, subproject_id: UUID) -> list[Campaign]:
-        docs = await self._col.find({"subproject_id": str(subproject_id)}).to_list(length=100)
+        docs = await self._col.find({"subproject_id": subproject_id}).to_list(length=100)
         return [_campaign_from_doc(d) for d in docs]
 
     async def update(self, campaign: Campaign) -> None:
         doc = _campaign_to_doc(campaign)
         doc.pop("_id")
-        await self._col.update_one({"_id": str(campaign.id)}, {"$set": doc})
+        await self._col.update_one({"_id": campaign.id}, {"$set": doc})
 
     async def delete(self, campaign_id: UUID) -> None:
-        await self._col.delete_one({"_id": str(campaign_id)})
+        await self._col.delete_one({"_id": campaign_id})

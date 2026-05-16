@@ -10,7 +10,8 @@ from src.shared import database
 from src.dev import router as dev_router
 from src.iam.api import router as auth_router
 from src.iam.api.authz import router as authz_router
-from src.iam.application.event_handlers import register_handlers
+from src.iam.application.event_handlers import register_handlers as register_iam_handlers
+from src.scopes.application.event_handlers import register_handlers as register_scopes_handlers
 from src.iam.infrastructure.enforcer import init_enforcer
 from src.conversations.api import router as conversations_router
 from src.imports.api import router as imports_router
@@ -21,7 +22,8 @@ from src.scopes.api import router as scopes_router
 async def lifespan(app: FastAPI):
     await database.connect()
     await init_enforcer(database.get_db())
-    register_handlers()
+    register_iam_handlers()
+    register_scopes_handlers()
     yield
     await database.disconnect()
 

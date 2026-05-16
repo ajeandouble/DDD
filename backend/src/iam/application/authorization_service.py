@@ -3,7 +3,9 @@ from uuid import UUID
 import casbin
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from src.iam.domain.events import OrgMemberAdded, OrgMemberRemoved
 from src.iam.domain.repositories import GroupRepository
+from src.shared.events import publish
 
 
 class NotAuthorized(Exception):
@@ -93,6 +95,12 @@ class AuthorizationService:
             return False
         return _ROLE_RANK.get(role, -1) <= _ROLE_RANK[granter_role]
 
+    async def effective_role(
+        self, subject: str, scope_type: str, scope_id: str, org_id: str | None = None
+    ) -> str | None:
+        """Public alias for _highest_role."""
+        return await self._highest_role(subject, scope_type, scope_id, org_id=org_id)
+
     async def _highest_role(
         self,
         subject: str,
@@ -134,6 +142,8 @@ class AuthorizationService:
         domain = f"{scope_type}:{scope_id}"
         self._e.add_grouping_policy(subject, role, domain)
         await self._save_g_rule(subject, role, domain)
+        if scope_type == "org" and subject.startswith("user:"):
+            await publish(OrgMemberAdded(org_id=UUID(scope_id), user_id=UUID(subject[5:])))
 
     async def revoke_role(
         self,
@@ -149,6 +159,8 @@ class AuthorizationService:
         domain = f"{scope_type}:{scope_id}"
         self._e.remove_grouping_policy(subject, role, domain)
         await self._delete_g_rule(subject, role, domain)
+        if scope_type == "org" and subject.startswith("user:"):
+            await publish(OrgMemberRemoved(org_id=UUID(scope_id), user_id=UUID(subject[5:])))
 
     # -----------------------------------------------------------------
     # Seed helpers — called when scopes are created

@@ -25,6 +25,8 @@ import {
   createCampaign,
 } from "../lib/api";
 import { ConversationsSection } from "../components/ConversationsSection";
+import { MembersDrawer } from "../components/MembersDrawer";
+import { useCanManageMembers } from "../hooks/useMyRoles";
 
 export function CampaignsPage() {
   const { orgId, projectId, subprojectId } = useParams<{
@@ -35,6 +37,8 @@ export function CampaignsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [opened, { open, close }] = useDisclosure(false);
+  const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
+  const canManageMembers = useCanManageMembers(orgId, "subproject", subprojectId);
   const [name, setName] = useState("");
 
   const { data: org } = useQuery({
@@ -112,7 +116,22 @@ export function CampaignsPage() {
           <Text size="sm">{subproject?.name ?? subprojectId}</Text>
         </Breadcrumbs>
 
-        <Title order={2}>{subproject?.name}</Title>
+        <Group justify="space-between">
+          <Title order={2}>{subproject?.name}</Title>
+          {canManageMembers && (
+            <Button size="xs" variant="light" onClick={openMembers}>
+              Members
+            </Button>
+          )}
+        </Group>
+
+        <MembersDrawer
+          orgId={orgId!}
+          scopeType="subproject"
+          scopeId={subprojectId!}
+          opened={membersOpened}
+          onClose={closeMembers}
+        />
 
         <ConversationsSection
           organizationId={orgId!}

@@ -24,12 +24,19 @@ class SeedResult(BaseModel):
     campaign_id: str
 
 
+# (email, password, description)
 _USERS = [
-    ("superadmin@ddd.dev", "SuperAdmin123!", "superadmin"),
-    ("alice@ddd.dev", "Alice123!", "org_admin"),
-    ("bob@ddd.dev", "Bob123!", "supervisor"),
-    ("carol@ddd.dev", "Carol123!", "editor"),
-    ("dave@ddd.dev", "Dave123!", "viewer"),
+    ("superadmin@ddd.dev", "SuperAdmin123!", "superadmin — bypasses all checks"),
+    ("alice@ddd.dev",      "Alice123!",      "org owner → admin at org (auto)"),
+    ("bob@ddd.dev",        "Bob123!",        "supervisor at org"),
+    ("carol@ddd.dev",      "Carol123!",      "editor at project"),
+    ("dave@ddd.dev",       "Dave123!",       "viewer at campaign"),
+    ("eve@ddd.dev",        "Eve123!",        "supervisor at subproject"),
+    ("frank@ddd.dev",      "Frank123!",      "editor at org"),
+    ("grace@ddd.dev",      "Grace123!",      "viewer at project"),
+    ("henry@ddd.dev",      "Henry123!",      "editor at campaign"),
+    ("ivan@ddd.dev",       "Ivan123!",       "viewer at org"),
+    ("judy@ddd.dev",       "Judy123!",       "no role — locked out of org"),
 ]
 
 
@@ -40,9 +47,9 @@ async def seed():
         CreateConversationCommand,
     )
     from src.conversations.infrastructure.repositories import MongoConversationRepository
-    from src.iam.application.auth_service import AuthService, AuthError
+    from src.iam.application.auth_service import AuthError, AuthService
     from src.iam.application.authorization_service import AuthorizationService
-    from src.iam.domain.models import Tag
+    from src.iam.domain.models import Group, Tag
     from src.iam.infrastructure.enforcer import get_enforcer
     from src.iam.infrastructure.repositories import (
         MongoGroupRepository,
@@ -101,19 +108,22 @@ async def seed():
         try:
             await auth_svc.register(email, password)
         except AuthError:
-            pass  # already exists
+            pass
 
     users = {email: await user_repo.find_by_email(email) for email, _, _ in _USERS}
     superadmin_user = users["superadmin@ddd.dev"]
-    alice = users["alice@ddd.dev"]
-    bob = users["bob@ddd.dev"]
-    carol = users["carol@ddd.dev"]
-    dave = users["dave@ddd.dev"]
+    alice  = users["alice@ddd.dev"]
+    bob    = users["bob@ddd.dev"]
+    carol  = users["carol@ddd.dev"]
+    dave   = users["dave@ddd.dev"]
+    eve    = users["eve@ddd.dev"]
+    frank  = users["frank@ddd.dev"]
+    grace  = users["grace@ddd.dev"]
+    henry  = users["henry@ddd.dev"]
+    ivan   = users["ivan@ddd.dev"]
 
     # --- Authz service ---
     authz = AuthorizationService(get_enforcer(), MongoGroupRepository(db), db)
-
-    # Grant superadmin
     await authz.grant_superadmin(superadmin_user.id)
 
     # --- Create org / hierarchy (events fire automatically → lineage + seed_org) ---
@@ -150,71 +160,101 @@ async def seed():
         )
     )
 
-    # --- Assign roles ---
-    await authz.assign_role(f"user:{bob.id}", "supervisor", "org", str(org.id))
-    await authz.assign_role(f"user:{carol.id}", "editor", "project", str(project.id))
-    await authz.assign_role(f"user:{dave.id}", "viewer", "campaign", str(campaign.id))
+    # --- Assign individual roles ---
+    oid  = str(org.id)
+    pid  = str(project.id)
+    sid  = str(subproject.id)
+    cid  = str(campaign.id)
+
+    await authz.assign_role(f"user:{bob.id}",   "supervisor", "org",        oid)
+    await authz.assign_role(f"user:{carol.id}",  "editor",     "project",    pid)
+    await authz.assign_role(f"user:{dave.id}",   "viewer",     "campaign",   cid)
+    await authz.assign_role(f"user:{eve.id}",    "supervisor", "subproject", sid)
+    await authz.assign_role(f"user:{frank.id}",  "editor",     "org",        oid)
+    await authz.assign_role(f"user:{grace.id}",  "viewer",     "project",    pid)
+    await authz.assign_role(f"user:{henry.id}",  "editor",     "campaign",   cid)
+    await authz.assign_role(f"user:{ivan.id}",   "viewer",     "org",        oid)
+
+    # --- Create groups ---
+    group_repo = MongoGroupRepository(db)
+
+    design_team = Group.create(name="Design Team", org_id=org.id)
+    design_team.add_member(carol.id)
+    design_team.add_member(grace.id)
+    await group_repo.save(design_team)
+    await authz.assign_role(f"group:{design_team.id}", "editor", "org", oid)
+
+    ops_team = Group.create(name="Ops Team", org_id=org.id)
+    ops_team.add_member(bob.id)
+    ops_team.add_member(eve.id)
+    await group_repo.save(ops_team)
+    await authz.assign_role(f"group:{ops_team.id}", "supervisor", "org", oid)
 
     # --- Create tags ---
     tag_repo = MongoTagRepository(db)
     tags = {}
-    for name in ("urgent", "design", "technical"):
+    for name in ("urgent", "design", "technical", "review", "blocked"):
         t = Tag.create(name=name, org_id=org.id)
         await tag_repo.save(t)
         tags[name] = t
 
     # --- Create conversations at each scope level ---
-    conv_handler = ConversationCommandHandler(MongoConversationRepository(db))
+    conv = ConversationCommandHandler(MongoConversationRepository(db))
 
-    await conv_handler.create(
-        CreateConversationCommand(
-            title="Q1 Strategy",
-            content="Aligning on company direction for Q1. Key topics: hiring, product roadmap, budget.",
-            created_by=alice.id,
-            organization_id=org.id,
-            scope_type="organization",
-            tag_ids=[tags["urgent"].id],
-        )
-    )
-    await conv_handler.create(
-        CreateConversationCommand(
-            title="Tech Stack Decision",
-            content="Evaluating React vs Vue for the frontend rewrite. Performance benchmarks attached.",
-            created_by=bob.id,
-            organization_id=org.id,
-            scope_id=project.id,
-            scope_type="project",
-            tag_ids=[tags["technical"].id],
-        )
-    )
-    await conv_handler.create(
-        CreateConversationCommand(
-            title="Component Library",
-            content="Proposing Mantine as our component library. Covers accessibility and dark mode.",
-            created_by=carol.id,
-            organization_id=org.id,
-            scope_id=subproject.id,
-            scope_type="subproject",
-            tag_ids=[tags["design"].id, tags["technical"].id],
-        )
-    )
-    await conv_handler.create(
-        CreateConversationCommand(
-            title="Launch Checklist",
-            content="Pre-launch checklist: QA sign-off, CDN config, monitoring alerts, rollback plan.",
-            created_by=carol.id,
-            organization_id=org.id,
-            scope_id=campaign.id,
-            scope_type="campaign",
-            tag_ids=[tags["urgent"].id, tags["design"].id],
-        )
-    )
+    await conv.create(CreateConversationCommand(
+        title="Q1 Strategy",
+        content="Aligning on company direction for Q1. Key topics: hiring, product roadmap, budget.",
+        created_by=alice.id, organization_id=org.id, scope_type="organization",
+        tag_ids=[tags["urgent"].id],
+    ))
+    await conv.create(CreateConversationCommand(
+        title="Hiring Plan",
+        content="We need 3 senior engineers and 1 designer by end of Q1.",
+        created_by=frank.id, organization_id=org.id, scope_type="organization",
+        tag_ids=[tags["review"].id],
+    ))
+    await conv.create(CreateConversationCommand(
+        title="Tech Stack Decision",
+        content="Evaluating React vs Vue for the frontend rewrite. Performance benchmarks attached.",
+        created_by=bob.id, organization_id=org.id, scope_id=project.id, scope_type="project",
+        tag_ids=[tags["technical"].id],
+    ))
+    await conv.create(CreateConversationCommand(
+        title="API Contract Review",
+        content="Reviewing the REST contract for the new auth service before handoff.",
+        created_by=carol.id, organization_id=org.id, scope_id=project.id, scope_type="project",
+        tag_ids=[tags["review"].id, tags["technical"].id],
+    ))
+    await conv.create(CreateConversationCommand(
+        title="Component Library",
+        content="Proposing Mantine as our component library. Covers accessibility and dark mode.",
+        created_by=carol.id, organization_id=org.id, scope_id=subproject.id, scope_type="subproject",
+        tag_ids=[tags["design"].id, tags["technical"].id],
+    ))
+    await conv.create(CreateConversationCommand(
+        title="Accessibility Audit",
+        content="WCAG 2.1 AA compliance pass required before launch. Flagging 4 failing components.",
+        created_by=grace.id, organization_id=org.id, scope_id=subproject.id, scope_type="subproject",
+        tag_ids=[tags["blocked"].id, tags["design"].id],
+    ))
+    await conv.create(CreateConversationCommand(
+        title="Launch Checklist",
+        content="Pre-launch checklist: QA sign-off, CDN config, monitoring alerts, rollback plan.",
+        created_by=henry.id, organization_id=org.id, scope_id=campaign.id, scope_type="campaign",
+        tag_ids=[tags["urgent"].id],
+    ))
+    await conv.create(CreateConversationCommand(
+        title="Post-launch Retrospective",
+        content="What went well, what didn't. Keeping this open for async comments for 2 weeks.",
+        created_by=eve.id, organization_id=org.id, scope_id=campaign.id, scope_type="campaign",
+        tag_ids=[tags["review"].id],
+    ))
 
     return SeedResult(
         status="seeded",
         credentials=[SeedCredentials(email=e, password=p, role=r) for e, p, r in _USERS],
-        org_id=str(org.id),
-        project_id=str(project.id),
-        subproject_id=str(subproject.id),
-        campaign_id=str(campaign.id),
+        org_id=oid,
+        project_id=pid,
+        subproject_id=sid,
+        campaign_id=cid,
     )

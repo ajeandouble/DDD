@@ -7,17 +7,17 @@ from src.shared.mongo_repository import MongoRepository
 
 def _to_doc(c: Conversation) -> dict:
     return {
-        "_id": str(c.id),
+        "_id": c.id,
         "title": c.title,
         "content": c.content,
         "timestamp": c.timestamp,
         "metadata": [list(pair) for pair in c.metadata],
         "emit_webhook": c.emit_webhook,
-        "created_by": str(c.created_by),
-        "organization_id": str(c.organization_id) if c.organization_id else None,
-        "scope_id": str(c.scope_id) if c.scope_id else None,
+        "created_by": c.created_by,
+        "organization_id": c.organization_id,
+        "scope_id": c.scope_id,
         "scope_type": c.scope_type,
-        "tag_ids": [str(t) for t in c.tag_ids],
+        "tag_ids": list(c.tag_ids),
         "stats": {
             "word_count": c.stats.word_count,
             "duration_seconds": c.stats.duration_seconds,
@@ -29,17 +29,17 @@ def _to_doc(c: Conversation) -> dict:
 def _from_doc(doc: dict) -> Conversation:
     raw_stats = doc.get("stats", {})
     return Conversation(
-        id=UUID(doc["_id"]),
+        id=doc["_id"],
         title=doc["title"],
         content=doc["content"],
         timestamp=doc["timestamp"],
         metadata=[tuple(pair) for pair in doc.get("metadata", [])],
         emit_webhook=doc.get("emit_webhook", False),
-        created_by=UUID(doc["created_by"]),
-        organization_id=UUID(doc["organization_id"]) if doc.get("organization_id") else None,
-        scope_id=UUID(doc["scope_id"]) if doc.get("scope_id") else None,
+        created_by=doc["created_by"],
+        organization_id=doc.get("organization_id"),
+        scope_id=doc.get("scope_id"),
         scope_type=doc.get("scope_type"),
-        tag_ids=[UUID(t) for t in doc.get("tag_ids", [])],
+        tag_ids=list(doc.get("tag_ids", [])),
         stats=ConversationStats(
             word_count=raw_stats.get("word_count"),
             duration_seconds=raw_stats.get("duration_seconds"),
@@ -55,7 +55,7 @@ class MongoConversationRepository(MongoRepository, ConversationRepository):
         await self._col.insert_one(_to_doc(conversation))
 
     async def find_by_id(self, conversation_id: UUID) -> Conversation | None:
-        doc = await self._col.find_one({"_id": str(conversation_id)})
+        doc = await self._col.find_one({"_id": conversation_id})
         if doc is None:
             return None
         return _from_doc(doc)
@@ -69,11 +69,10 @@ class MongoConversationRepository(MongoRepository, ConversationRepository):
     ) -> list[Conversation]:
         query: dict = {}
         if organization_id is not None:
-            query["organization_id"] = str(organization_id)
+            query["organization_id"] = organization_id
         if scope_id is not None:
-            query["scope_id"] = str(scope_id)
+            query["scope_id"] = scope_id
         elif organization_id is not None:
-            # org-level conversations have no sub-scope
             query["scope_id"] = None
         if scope_type is not None:
             query["scope_type"] = scope_type
@@ -83,7 +82,7 @@ class MongoConversationRepository(MongoRepository, ConversationRepository):
     async def update(self, conversation: Conversation) -> None:
         doc = _to_doc(conversation)
         doc.pop("_id")
-        await self._col.update_one({"_id": str(conversation.id)}, {"$set": doc})
+        await self._col.update_one({"_id": conversation.id}, {"$set": doc})
 
     async def delete(self, conversation_id: UUID) -> None:
-        await self._col.delete_one({"_id": str(conversation_id)})
+        await self._col.delete_one({"_id": conversation_id})

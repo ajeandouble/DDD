@@ -2,6 +2,8 @@ import { api, authHeaders } from "./http";
 import type { TokenResponse, UserResponse } from "../dto/auth";
 import type { ConversationResponse } from "../dto/conversations";
 import type { Campaign, Organization, Project, Subproject } from "../dto/scopes";
+import type { ApiKey, ApiKeyCreated, IamGroup, RoleAssignment, UserSummary } from "../dto/iam";
+import { ScopeRolesSchema, type ScopeRoles } from "../dto/permissions";
 
 export const login = (email: string, password: string): Promise<TokenResponse> =>
   api.post("auth/login", { json: { email, password } }).json();
@@ -88,3 +90,94 @@ export const createCampaign = (subprojectId: string, name: string): Promise<Camp
       headers: authHeaders(),
     })
     .json();
+
+// --- IAM ---
+
+export const listUsers = (): Promise<UserSummary[]> =>
+  api.get("iam/users", { headers: authHeaders() }).json();
+
+export const listRoles = (
+  orgId: string,
+  opts?: { scope_type?: string; scope_id?: string },
+): Promise<RoleAssignment[]> => {
+  const searchParams = opts
+    ? (Object.fromEntries(
+        Object.entries(opts).filter(([, v]) => v != null),
+      ) as Record<string, string>)
+    : undefined;
+  return api
+    .get(`iam/organizations/${orgId}/roles`, { headers: authHeaders(), searchParams })
+    .json();
+};
+
+export const assignRole = (
+  orgId: string,
+  body: { subject: string; role: string; scope_type: string; scope_id: string },
+): Promise<void> =>
+  api
+    .post(`iam/organizations/${orgId}/roles/assign`, { json: body, headers: authHeaders() })
+    .then(() => undefined);
+
+export const revokeRole = (
+  orgId: string,
+  body: { subject: string; role: string; scope_type: string; scope_id: string },
+): Promise<void> =>
+  api
+    .post(`iam/organizations/${orgId}/roles/revoke`, { json: body, headers: authHeaders() })
+    .then(() => undefined);
+
+export const listGroups = (orgId: string): Promise<IamGroup[]> =>
+  api.get(`iam/organizations/${orgId}/groups`, { headers: authHeaders() }).json();
+
+export const createGroup = (orgId: string, name: string): Promise<IamGroup> =>
+  api
+    .post(`iam/organizations/${orgId}/groups`, { json: { name }, headers: authHeaders() })
+    .json();
+
+export const deleteGroup = (orgId: string, groupId: string): Promise<void> =>
+  api
+    .delete(`iam/organizations/${orgId}/groups/${groupId}`, { headers: authHeaders() })
+    .then(() => undefined);
+
+export const addGroupMember = (
+  orgId: string,
+  groupId: string,
+  userId: string,
+): Promise<IamGroup> =>
+  api
+    .post(`iam/organizations/${orgId}/groups/${groupId}/members`, {
+      json: { user_id: userId },
+      headers: authHeaders(),
+    })
+    .json();
+
+export const removeGroupMember = (
+  orgId: string,
+  groupId: string,
+  memberId: string,
+): Promise<IamGroup> =>
+  api
+    .delete(`iam/organizations/${orgId}/groups/${groupId}/members/${memberId}`, {
+      headers: authHeaders(),
+    })
+    .json();
+
+export const listApiKeys = (): Promise<ApiKey[]> =>
+  api.get("iam/api-keys", { headers: authHeaders() }).json();
+
+export const createApiKey = (body: {
+  name: string;
+  scope_type?: string;
+  scope_id?: string;
+  role?: string;
+}): Promise<ApiKeyCreated> =>
+  api.post("iam/api-keys", { json: body, headers: authHeaders() }).json();
+
+export const deleteApiKey = (keyId: string): Promise<void> =>
+  api.delete(`iam/api-keys/${keyId}`, { headers: authHeaders() }).then(() => undefined);
+
+export const getMyRoles = (orgId: string): Promise<ScopeRoles> =>
+  api
+    .get(`iam/organizations/${orgId}/my-roles`, { headers: authHeaders() })
+    .json()
+    .then((data) => ScopeRolesSchema.parse(data));

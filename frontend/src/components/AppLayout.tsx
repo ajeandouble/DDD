@@ -1,6 +1,7 @@
 import { Navigate, Outlet, Link, useNavigate, useMatch } from "react-router-dom";
 import {
   AppShell,
+  ActionIcon,
   Group,
   Text,
   Button,
@@ -9,6 +10,8 @@ import {
   Divider,
   Burger,
   Skeleton,
+  useMantineColorScheme,
+  useComputedColorScheme,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
@@ -17,6 +20,8 @@ import { getOrganizations } from "../lib/api";
 export function AppLayout() {
   const navigate = useNavigate();
   const [navbarOpened, { toggle, close: closeNavbar }] = useDisclosure();
+  const { setColorScheme } = useMantineColorScheme();
+  const computed = useComputedColorScheme("light");
   const orgsMatch = useMatch("/orgs/:orgId/*");
   const activeOrgId = orgsMatch?.params.orgId;
 
@@ -54,9 +59,20 @@ export function AppLayout() {
               DDD
             </Text>
           </Group>
-          <Button variant="subtle" size="xs" color="gray" onClick={handleSignOut}>
-            Sign out
-          </Button>
+          <Group gap="xs">
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              aria-label="Toggle color scheme"
+              onClick={() => setColorScheme(computed === "dark" ? "light" : "dark")}
+            >
+              {computed === "dark" ? "☀" : "☽"}
+            </ActionIcon>
+            <Button variant="subtle" size="xs" color="gray" onClick={handleSignOut}>
+              Sign out
+            </Button>
+          </Group>
         </Group>
       </AppShell.Header>
 
@@ -91,6 +107,14 @@ export function AppLayout() {
             component={Link}
             to="/orgs"
             label="Manage organizations"
+            onClick={closeNavbar}
+            c="dimmed"
+            styles={{ label: { fontSize: "var(--mantine-font-size-xs)" } }}
+          />
+          <NavLink
+            component={Link}
+            to="/settings"
+            label="Settings"
             onClick={closeNavbar}
             c="dimmed"
             styles={{ label: { fontSize: "var(--mantine-font-size-xs)" } }}

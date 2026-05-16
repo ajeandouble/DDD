@@ -70,13 +70,7 @@ export function LoginPage() {
             />
           </div>
 
-          {mutation.isError && (
-            <p className={styles.error}>
-              {mutation.error instanceof Error
-                ? mutation.error.message
-                : "Something went wrong. Please try again."}
-            </p>
-          )}
+
 
           <button className={styles.button} type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? "Please wait…" : mode === "login" ? "Sign in" : "Register"}

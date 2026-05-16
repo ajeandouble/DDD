@@ -1,8 +1,11 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Title, Stack, Breadcrumbs, Anchor, Text } from "@mantine/core";
+import { Title, Stack, Breadcrumbs, Anchor, Text, Group, Button } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
 import { getOrganization, getProject, getSubproject, getCampaigns } from "../lib/api";
 import { ConversationsSection } from "../components/ConversationsSection";
+import { MembersDrawer } from "../components/MembersDrawer";
+import { useCanManageMembers } from "../hooks/useMyRoles";
 
 export function CampaignPage() {
   const { orgId, projectId, subprojectId, campaignId } = useParams<{
@@ -37,6 +40,8 @@ export function CampaignPage() {
   });
 
   const campaign = campaigns?.find((c) => c.id === campaignId);
+  const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
+  const canManageMembers = useCanManageMembers(orgId, "campaign", campaignId);
 
   return (
     <Stack gap="lg">
@@ -60,7 +65,22 @@ export function CampaignPage() {
         <Text size="sm">{campaign?.name ?? campaignId}</Text>
       </Breadcrumbs>
 
-      <Title order={2}>{campaign?.name}</Title>
+      <Group justify="space-between">
+        <Title order={2}>{campaign?.name}</Title>
+        {canManageMembers && (
+          <Button size="xs" variant="light" onClick={openMembers}>
+            Members
+          </Button>
+        )}
+      </Group>
+
+      <MembersDrawer
+        orgId={orgId!}
+        scopeType="campaign"
+        scopeId={campaignId!}
+        opened={membersOpened}
+        onClose={closeMembers}
+      />
 
       <ConversationsSection
         organizationId={orgId!}
