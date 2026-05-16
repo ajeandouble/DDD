@@ -14,11 +14,13 @@
     "@mantine/core": "^9.2.1",
     "@mantine/hooks": "^9.2.1",
     "@mantine/notifications": "^9.2.1",
+    "@tabler/icons-react": "^3.44.0",
     "@tanstack/react-query": "^5.100.10",
     "ky": "^2.0.2",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.15.1",
+    "wavesurfer.js": "^7.12.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {

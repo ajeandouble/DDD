@@ -13,10 +13,24 @@ export const ConversationStats = z.object({
 
 const ScopeType = z.enum(["organization", "project", "subproject", "campaign"]).nullable();
 
+export const TranscriptWord = z.object({
+  word: z.string(),
+  start: z.number(),
+  end: z.number(),
+});
+export type TranscriptWord = z.infer<typeof TranscriptWord>;
+
+export const SpeakerTurn = z.object({
+  speaker: z.string(),
+  text: z.string(),
+  words: z.array(TranscriptWord).default([]),
+});
+export type SpeakerTurn = z.infer<typeof SpeakerTurn>;
+
 export const ConversationResponse = z.object({
   id: z.string().uuid(),
   title: z.string(),
-  content: z.string(),
+  content: z.union([z.string(), z.array(SpeakerTurn)]),
   timestamp: z.string(),
   metadata: z.array(MetadataEntry),
   emit_webhook: z.boolean(),

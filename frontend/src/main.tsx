@@ -15,6 +15,7 @@ import { SubprojectsPage } from "./pages/SubprojectsPage";
 import { CampaignsPage } from "./pages/CampaignsPage";
 import { CampaignPage } from "./pages/CampaignPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { ConversationPage } from "./pages/ConversationPage";
 
 const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <Navigate to="/orgs" replace /> },
       { path: "/settings", element: <SettingsPage /> },
+      { path: "/conversations/:convId", element: <ConversationPage /> },
       { path: "/orgs", element: <OrganizationsPage /> },
       { path: "/orgs/:orgId", element: <ProjectsPage /> },
       { path: "/orgs/:orgId/projects/:projectId", element: <SubprojectsPage /> },

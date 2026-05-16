@@ -41,6 +41,9 @@ export const updateConversation = (
 ): Promise<ConversationResponse> =>
   api.patch(`conversations/${id}`, { json: data, headers: authHeaders() }).json();
 
+export const getConversation = (id: string): Promise<ConversationResponse> =>
+  api.get(`conversations/${id}`, { headers: authHeaders() }).json();
+
 export const deleteConversation = (id: string): Promise<void> =>
   api.delete(`conversations/${id}`, { headers: authHeaders() }).json();
 
@@ -181,3 +184,18 @@ export const getMyRoles = (orgId: string): Promise<ScopeRoles> =>
     .get(`iam/organizations/${orgId}/my-roles`, { headers: authHeaders() })
     .json()
     .then((data) => ScopeRolesSchema.parse(data));
+
+// --- Imports ---
+
+export const getImportJobs = (conversationId: string): Promise<{ id: string; storage_key: string | null; status: string }[]> =>
+  api.get(`imports/conversation/${conversationId}`, { headers: authHeaders() }).json();
+
+export const uploadAudio = (
+  conversationId: string,
+  file: File,
+): Promise<{ id: string; status: string; storage_key: string | null }> => {
+  const form = new FormData();
+  form.append("conversation_id", conversationId);
+  form.append("file", file);
+  return api.post("imports/", { body: form, headers: authHeaders() }).json();
+};
