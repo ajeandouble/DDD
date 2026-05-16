@@ -90,11 +90,18 @@ export function ProjectsPage() {
 
         <Group justify="space-between">
           <Title order={2}>{org?.name}</Title>
-          {canManageMembers && (
-            <Button size="xs" variant="light" onClick={openMembers}>
-              Members
-            </Button>
-          )}
+          <Group gap={6}>
+            {canManageMembers && (
+              <Button size="xs" variant="light" component={Link} to={`/orgs/${orgId}/webhooks`}>
+                Webhooks
+              </Button>
+            )}
+            {canManageMembers && (
+              <Button size="xs" variant="light" onClick={openMembers}>
+                Members
+              </Button>
+            )}
+          </Group>
         </Group>
 
         <MembersDrawer

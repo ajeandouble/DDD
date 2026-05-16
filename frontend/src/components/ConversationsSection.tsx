@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useBackoffInterval } from "../hooks/useBackoffInterval";
 import {
   Group,
   Button,
@@ -50,7 +51,13 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
 
-  const { data, isLoading, error } = useQuery({
+  // A conversation is "pending transcript" if it has a non-array content and was created
+  // recently enough that transcription might still be running (within 2 hours).
+  const TWO_HOURS = 2 * 60 * 60 * 1_000;
+  const [hasPending, setHasPending] = useState(false);
+  const refetchInterval = useBackoffInterval(hasPending);
+
+  const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: ["conversations", ...queryKey],
     queryFn: () =>
       getConversations(
@@ -59,7 +66,17 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
           : { organization_id: organizationId },
       ),
     retry: false,
+    refetchInterval,
   });
+
+  useEffect(() => {
+    if (!data) return;
+    const now = Date.now();
+    const pending = data.some(
+      (c) => !Array.isArray(c.content) && now - new Date(c.timestamp).getTime() < TWO_HOURS,
+    );
+    setHasPending(pending);
+  }, [dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["conversations", ...queryKey] });

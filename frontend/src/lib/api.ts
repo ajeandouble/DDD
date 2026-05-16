@@ -185,6 +185,38 @@ export const getMyRoles = (orgId: string): Promise<ScopeRoles> =>
     .json()
     .then((data) => ScopeRolesSchema.parse(data));
 
+// --- Webhooks ---
+
+import type { Delivery, WebhookEndpoint } from "../dto/webhooks";
+
+export const listWebhookEndpoints = (orgId: string): Promise<WebhookEndpoint[]> =>
+  api.get(`webhooks/organizations/${orgId}/endpoints`, { headers: authHeaders() }).json();
+
+export const createWebhookEndpoint = (
+  orgId: string,
+  body: { url: string; secret?: string; event_types: string[]; transformer: string; enabled: boolean },
+): Promise<WebhookEndpoint> =>
+  api.post(`webhooks/organizations/${orgId}/endpoints`, { json: body, headers: authHeaders() }).json();
+
+export const updateWebhookEndpoint = (
+  orgId: string,
+  epId: string,
+  body: Partial<{ url: string; secret: string; event_types: string[]; transformer: string; enabled: boolean }>,
+): Promise<WebhookEndpoint> =>
+  api.patch(`webhooks/organizations/${orgId}/endpoints/${epId}`, { json: body, headers: authHeaders() }).json();
+
+export const deleteWebhookEndpoint = (orgId: string, epId: string): Promise<void> =>
+  api.delete(`webhooks/organizations/${orgId}/endpoints/${epId}`, { headers: authHeaders() }).then(() => undefined);
+
+export const listDeliveries = (orgId: string, epId: string): Promise<Delivery[]> =>
+  api.get(`webhooks/organizations/${orgId}/endpoints/${epId}/deliveries`, { headers: authHeaders() }).json();
+
+export const testTransformer = (
+  transformer: string,
+  payload: Record<string, unknown>,
+): Promise<{ result: Record<string, unknown> | null; error: string | null }> =>
+  api.post("webhooks/transformer/test", { json: { transformer, payload }, headers: authHeaders() }).json();
+
 // --- Imports ---
 
 export const getImportJobs = (conversationId: string): Promise<{ id: string; storage_key: string | null; status: string }[]> =>
