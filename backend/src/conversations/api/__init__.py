@@ -1,3 +1,5 @@
+import json
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -72,7 +74,7 @@ class ConversationUpdate(BaseModel):
 class ConversationResponse(BaseModel):
     id: UUID
     title: str
-    content: str
+    content: Any  # str for plain text; list[{speaker, text}] for transcripts
     timestamp: str
     metadata: list[MetadataEntry]
     emit_webhook: bool
@@ -84,11 +86,20 @@ class ConversationResponse(BaseModel):
     stats: StatsResponse
 
 
+def _parse_content(raw: str) -> Any:
+    if raw.startswith("["):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            pass
+    return raw
+
+
 def _to_response(c: Conversation) -> ConversationResponse:
     return ConversationResponse(
         id=c.id,
         title=c.title,
-        content=c.content,
+        content=_parse_content(c.content),
         timestamp=c.timestamp.isoformat(),
         metadata=[MetadataEntry(key=k, value=v) for k, v in c.metadata],
         emit_webhook=c.emit_webhook,

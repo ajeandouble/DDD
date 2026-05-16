@@ -183,7 +183,7 @@ async def revoke_role(
     user: User = Depends(get_current_user),
     authz: AuthorizationService = Depends(get_authz),
 ):
-    if body.subject == f"user:{user.id}":
+    if body.subject == f"user:{user.id}" and not authz.is_superadmin(f"user:{user.id}"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot revoke your own role")
     if not await authz.can_assign(
         f"user:{user.id}", body.role, body.scope_type, str(body.scope_id), org_id=str(org_id)
@@ -278,6 +278,11 @@ async def remove_group_member(
     authz: AuthorizationService = Depends(get_authz),
     repo: MongoGroupRepository = Depends(_group_repo),
 ):
+    if member_id == user.id and not authz.is_superadmin(f"user:{user.id}"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot remove yourself from a group",
+        )
     await _require_manage_members(org_id, user, authz)
     group = await repo.find_by_id(group_id)
     if group is None or group.org_id != org_id:
@@ -299,17 +304,17 @@ async def create_api_key(
     authz: AuthorizationService = Depends(get_authz),
     repo: MongoApiKeyRepository = Depends(_apikey_repo),
 ):
-    db = get_db()
     subject = f"user:{user.id}"
-    # Require supervisor+ in at least one org
-    rule = await db["casbin_rules"].find_one(
-        {"rule.0": subject, "rule.1": {"$in": ["supervisor", "admin"]}}
-    )
-    if rule is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Requires supervisor or admin role in at least one organization",
+    if not authz.is_superadmin(subject):
+        db = get_db()
+        rule = await db["casbin_rules"].find_one(
+            {"rule.0": subject, "rule.1": {"$in": ["supervisor", "admin"]}}
         )
+        if rule is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Requires supervisor or admin role in at least one organization",
+            )
 
     api_key, raw_key = ApiKey.create(
         name=body.name,

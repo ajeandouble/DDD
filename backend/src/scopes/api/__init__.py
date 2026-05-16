@@ -218,7 +218,11 @@ async def _require(
 async def list_organizations(
     queries: OrganizationQueryHandler = Depends(_org_queries),
     principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
 ):
+    subject = f"user:{principal.id}" if isinstance(principal, User) else f"apikey:{principal.id}"
+    if authz.is_superadmin(subject):
+        return [_org_resp(o) for o in await queries._repo.find_all()]
     owner_id = principal.id if isinstance(principal, User) else principal.owner_id
     return [_org_resp(o) for o in await queries.list_for_member(owner_id)]
 
@@ -238,10 +242,12 @@ async def get_organization(
     org_id: UUID,
     queries: OrganizationQueryHandler = Depends(_org_queries),
     principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
 ):
     org = await queries.get_by_id(org_id)
+    subject = f"user:{principal.id}" if isinstance(principal, User) else f"apikey:{principal.id}"
     owner_id = principal.id if isinstance(principal, User) else principal.owner_id
-    if org is None or not org.is_member(owner_id):
+    if org is None or (not authz.is_superadmin(subject) and not org.is_member(owner_id)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
     return _org_resp(org)
 
@@ -277,10 +283,12 @@ async def list_projects(
     queries: ProjectQueryHandler = Depends(_project_queries),
     org_queries: OrganizationQueryHandler = Depends(_org_queries),
     principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
 ):
     org = await org_queries.get_by_id(org_id)
+    subject = f"user:{principal.id}" if isinstance(principal, User) else f"apikey:{principal.id}"
     owner_id = principal.id if isinstance(principal, User) else principal.owner_id
-    if org is None or not org.is_member(owner_id):
+    if org is None or (not authz.is_superadmin(subject) and not org.is_member(owner_id)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
     return [_project_resp(p) for p in await queries.list_by_org(org_id)]
 

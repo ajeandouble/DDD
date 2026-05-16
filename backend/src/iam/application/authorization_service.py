@@ -109,6 +109,9 @@ class AuthorizationService:
         org_id: str | None = None,
     ) -> str | None:
         """Return the highest-ranked role subject holds at scope_type:scope_id or any ancestor."""
+        if self.is_superadmin(subject):
+            return "admin"
+
         subjects = [subject]
         if subject.startswith("user:") and org_id:
             try:
@@ -165,6 +168,9 @@ class AuthorizationService:
     # -----------------------------------------------------------------
     # Seed helpers — called when scopes are created
     # -----------------------------------------------------------------
+
+    def is_superadmin(self, subject: str) -> bool:
+        return "superadmin" in self._e.get_roles_for_user_in_domain(subject, "platform")
 
     async def grant_superadmin(self, user_id: UUID) -> None:
         """Grant platform-level superadmin — bypasses all scope checks."""

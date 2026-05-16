@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 
 load_dotenv(".env.dev")
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -12,10 +13,15 @@ from src.iam.api import router as auth_router
 from src.iam.api.authz import router as authz_router
 from src.iam.application.event_handlers import register_handlers as register_iam_handlers
 from src.scopes.application.event_handlers import register_handlers as register_scopes_handlers
+from src.analyzer.application.event_handlers import register_handlers as register_analyzer_handlers
+from src.conversations.application.event_handlers import register_handlers as register_conversation_handlers
 from src.iam.infrastructure.enforcer import init_enforcer
 from src.conversations.api import router as conversations_router
 from src.imports.api import router as imports_router
 from src.scopes.api import router as scopes_router
+from src.analyzer.api import router as analyzer_router
+from src.storage.api import router as storage_router
+import src.analyzer.application as analyzer_worker
 
 
 @asynccontextmanager
@@ -24,7 +30,11 @@ async def lifespan(app: FastAPI):
     await init_enforcer(database.get_db())
     register_iam_handlers()
     register_scopes_handlers()
+    register_analyzer_handlers()
+    register_conversation_handlers()
+    task = asyncio.create_task(analyzer_worker.worker(database.get_db()))
     yield
+    task.cancel()
     await database.disconnect()
 
 
@@ -45,6 +55,8 @@ app.include_router(authz_router)
 app.include_router(conversations_router)
 app.include_router(imports_router)
 app.include_router(scopes_router)
+app.include_router(analyzer_router)
+app.include_router(storage_router)
 
 
 @app.get("/health")

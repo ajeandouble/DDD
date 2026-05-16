@@ -1,25 +1,24 @@
+import tempfile
+import os
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
+from src.imports.application import store_file
+from src.imports.domain.events import FileIngested
 from src.imports.domain.models import ImportJob
 from src.imports.infrastructure.repositories import MongoImportJobRepository
 from src.shared.database import get_db
 from src.iam.domain.models import User
 from src.shared.deps import get_current_user
+from src.shared.events import publish
 
 router = APIRouter(prefix="/imports", tags=["imports"])
 
 
 def _repo() -> MongoImportJobRepository:
     return MongoImportJobRepository(get_db())
-
-
-class ImportJobCreate(BaseModel):
-    conversation_id: UUID
-    filename: str
-    content_type: str
 
 
 class ImportJobResponse(BaseModel):
@@ -47,18 +46,38 @@ def _to_response(job: ImportJob) -> ImportJobResponse:
 
 
 @router.post("/", response_model=ImportJobResponse, status_code=status.HTTP_201_CREATED)
-async def create_import_job(
-    body: ImportJobCreate,
+async def upload_file(
+    conversation_id: UUID = Form(...),
+    file: UploadFile = File(...),
     repo: MongoImportJobRepository = Depends(_repo),
     user: User = Depends(get_current_user),
 ):
     job = ImportJob.create(
-        conversation_id=body.conversation_id,
-        filename=body.filename,
-        content_type=body.content_type,
+        conversation_id=conversation_id,
+        filename=file.filename or "upload",
+        content_type=file.content_type or "application/octet-stream",
         created_by=user.id,
     )
+
+    suffix = os.path.splitext(file.filename or "")[1] or ".bin"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    storage_key = await store_file(tmp_path, file.filename or "upload")
+    job.mark_uploaded(storage_key)
     await repo.save(job)
+
+    await publish(
+        FileIngested(
+            job_id=job.id,
+            conversation_id=job.conversation_id,
+            storage_key=storage_key,
+            filename=job.filename,
+        )
+    )
+
     return _to_response(job)
 
 

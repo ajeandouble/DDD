@@ -42,6 +42,10 @@ class MongoOrganizationRepository(MongoRepository, OrganizationRepository):
         doc = await self._col.find_one({"_id": org_id})
         return _org_from_doc(doc) if doc else None
 
+    async def find_all(self) -> list[Organization]:
+        docs = await self._col.find({}).to_list(length=1000)
+        return [_org_from_doc(d) for d in docs]
+
     async def find_by_member(self, user_id: UUID) -> list[Organization]:
         docs = await self._col.find({"member_ids": user_id}).to_list(length=100)
         return [_org_from_doc(d) for d in docs]
