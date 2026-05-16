@@ -12,16 +12,51 @@ import {
 } from "../lib/api";
 import type { WebhookEndpoint, Delivery } from "../dto/webhooks";
 
-const SAMPLE_PAYLOAD = {
-  event: "transcript.ready",
-  conversation_id: "00000000-0000-0000-0000-000000000000",
-  job_id: "00000000-0000-0000-0000-000000000001",
-  content: [{ speaker: "Speaker A", text: "Hello world", words: [] }],
-  stats: { word_count: 2, duration_seconds: 3.5 },
-};
+const DEFAULT_SAMPLE_PAYLOAD = JSON.stringify(
+  {
+    event: "conversation.transcribed",
+    conversation_id: "00000000-0000-0000-0000-000000000000",
+    org_id: "00000000-0000-0000-0000-000000000002",
+    title: "Interview — Matilda",
+    timestamp: "2025-05-16T10:00:00Z",
+    scope_type: "campaign",
+    scope_id: "00000000-0000-0000-0000-000000000003",
+    metadata: [{ key: "interviewer", value: "Alice" }],
+    content: [
+      {
+        speaker: "Speaker A",
+        text: "So, what's your favourite book then?",
+        words: [
+          { word: " So,", start: 0.0, end: 0.76 },
+          { word: " what's", start: 0.76, end: 1.16 },
+          { word: " your", start: 1.16, end: 1.24 },
+          { word: " favourite", start: 1.24, end: 1.54 },
+          { word: " book", start: 1.54, end: 1.86 },
+          { word: " then?", start: 1.86, end: 2.46 },
+        ],
+      },
+      {
+        speaker: "Speaker B",
+        text: "It has to be Matilda.",
+        words: [
+          { word: " It", start: 2.62, end: 2.86 },
+          { word: " has", start: 2.86, end: 3.38 },
+          { word: " to", start: 3.38, end: 3.56 },
+          { word: " be", start: 3.56, end: 4.56 },
+          { word: " Matilda.", start: 4.56, end: 5.16 },
+        ],
+      },
+    ],
+    stats: { word_count: 11, duration_seconds: 5.16 },
+  },
+  null,
+  2,
+);
 
-const DEFAULT_TRANSFORMER = `# payload has: event, conversation_id, job_id, content, stats
+const DEFAULT_TRANSFORMER = `# payload keys: event, conversation_id, org_id, title, timestamp,
+#   scope_type, scope_id, metadata, content (speaker turns), stats
 result = {
+    "title": payload["title"],
     "text": " ".join(t["text"] for t in payload["content"]),
     "duration": payload["stats"]["duration_seconds"],
 }`;
@@ -155,6 +190,83 @@ function DeliveryRow({ d }: { d: Delivery }) {
   );
 }
 
+function TransformerSection({
+  transformer,
+  onTransformerChange,
+}: {
+  transformer: string;
+  onTransformerChange: (v: string) => void;
+}) {
+  const [sampleRaw, setSampleRaw] = useState(DEFAULT_SAMPLE_PAYLOAD);
+  const [testResult, setTestResult] = useState<{ result: unknown; error: string | null; stdout: string } | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [payloadError, setPayloadError] = useState<string | null>(null);
+
+  const runTest = async () => {
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(sampleRaw);
+      setPayloadError(null);
+    } catch (e) {
+      setPayloadError(`Invalid JSON: ${(e as Error).message}`);
+      return;
+    }
+    setTesting(true);
+    try {
+      const r = await testTransformer(transformer, parsed);
+      setTestResult(r);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <Stack gap={4}>
+      <Text size="sm" fw={500}>Transformer</Text>
+      <Text size="xs" c="dimmed">
+        Receives <Code>payload</Code> dict. Assign a dict to <Code>result</Code>.
+      </Text>
+      <Textarea
+        value={transformer}
+        onChange={(e) => onTransformerChange(e.currentTarget.value)}
+        rows={8}
+        styles={{ input: { fontFamily: "monospace", fontSize: 13 } }}
+      />
+      <Text size="sm" fw={500} mt={4}>Sample payload</Text>
+      <Textarea
+        value={sampleRaw}
+        onChange={(e) => { setSampleRaw(e.currentTarget.value); setPayloadError(null); }}
+        rows={6}
+        error={payloadError}
+        styles={{ input: { fontFamily: "monospace", fontSize: 11 } }}
+      />
+      <Group justify="flex-end">
+        <Button size="xs" variant="light" loading={testing} onClick={runTest}>
+          Test
+        </Button>
+      </Group>
+      {testResult && (
+        <Stack gap={4}>
+          {testResult.stdout && (
+            <Code block style={{ fontSize: 11, whiteSpace: "pre-wrap" }}>
+              {testResult.stdout}
+            </Code>
+          )}
+          {testResult.error ? (
+            <Code block style={{ fontSize: 11, whiteSpace: "pre-wrap", color: "var(--mantine-color-red-6)" }}>
+              {testResult.error}
+            </Code>
+          ) : (
+            <Code block style={{ fontSize: 11 }}>
+              {JSON.stringify(testResult.result, null, 2)}
+            </Code>
+          )}
+        </Stack>
+      )}
+    </Stack>
+  );
+}
+
 function CreateModal({
   orgId, opened, onClose, onCreated,
 }: {
@@ -163,59 +275,22 @@ function CreateModal({
   const [url, setUrl] = useState("");
   const [secret, setSecret] = useState("");
   const [transformer, setTransformer] = useState(DEFAULT_TRANSFORMER);
-  const [testResult, setTestResult] = useState<{ result: unknown; error: string | null } | null>(null);
-  const [testing, setTesting] = useState(false);
 
   const mutation = useMutation({
     mutationFn: () =>
       createWebhookEndpoint(orgId, {
-        url, secret, event_types: ["transcript.ready"], transformer, enabled: true,
+        url, secret, event_types: ["conversation.transcribed"], transformer, enabled: true,
       }),
-    onSuccess: () => { onCreated(); onClose(); setUrl(""); setSecret(""); setTransformer(DEFAULT_TRANSFORMER); setTestResult(null); },
+    onSuccess: () => { onCreated(); onClose(); setUrl(""); setSecret(""); setTransformer(DEFAULT_TRANSFORMER); },
   });
-
-  const runTest = async () => {
-    setTesting(true);
-    try {
-      const r = await testTransformer(transformer, SAMPLE_PAYLOAD);
-      setTestResult(r);
-    } finally {
-      setTesting(false);
-    }
-  };
 
   return (
     <Modal opened={opened} onClose={onClose} title="New webhook endpoint" size="lg" centered>
       <Stack>
         <TextInput label="URL" placeholder="http://localhost:4000" value={url} onChange={(e) => setUrl(e.currentTarget.value)} />
         <TextInput label="Secret (for HMAC signature)" placeholder="optional" value={secret} onChange={(e) => setSecret(e.currentTarget.value)} />
-        <Select label="Event" data={[{ value: "transcript.ready", label: "transcript.ready" }]} value="transcript.ready" readOnly />
-
-        <Stack gap={4}>
-          <Text size="sm" fw={500}>Transformer</Text>
-          <Text size="xs" c="dimmed">
-            Receives <Code>payload</Code> dict. Assign a dict to <Code>result</Code>.
-          </Text>
-          <Textarea
-            value={transformer}
-            onChange={(e) => setTransformer(e.currentTarget.value)}
-            rows={8}
-            styles={{ input: { fontFamily: "monospace", fontSize: 13 } }}
-          />
-          <Group justify="flex-end">
-            <Button size="xs" variant="light" loading={testing} onClick={runTest}>
-              Test with sample payload
-            </Button>
-          </Group>
-          {testResult && (
-            <Code block style={{ fontSize: 11, whiteSpace: "pre-wrap" }}>
-              {testResult.error
-                ? `ERROR:\n${testResult.error}`
-                : JSON.stringify(testResult.result, null, 2)}
-            </Code>
-          )}
-        </Stack>
-
+        <Select label="Event" data={[{ value: "conversation.transcribed", label: "conversation.transcribed" }]} value="conversation.transcribed" readOnly />
+        <TransformerSection transformer={transformer} onTransformerChange={setTransformer} />
         {mutation.isError && <Alert color="red">{String(mutation.error)}</Alert>}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>Cancel</Button>
@@ -236,50 +311,18 @@ function EditModal({
   const [url, setUrl] = useState(ep.url);
   const [secret, setSecret] = useState(ep.secret);
   const [transformer, setTransformer] = useState(ep.transformer);
-  const [testResult, setTestResult] = useState<{ result: unknown; error: string | null } | null>(null);
-  const [testing, setTesting] = useState(false);
 
   const mutation = useMutation({
     mutationFn: () => updateWebhookEndpoint(orgId, ep.id, { url, secret, transformer }),
-    onSuccess: () => { onSaved(); onClose(); setTestResult(null); },
+    onSuccess: () => { onSaved(); onClose(); },
   });
-
-  const runTest = async () => {
-    setTesting(true);
-    try {
-      const r = await testTransformer(transformer, SAMPLE_PAYLOAD);
-      setTestResult(r);
-    } finally {
-      setTesting(false);
-    }
-  };
 
   return (
     <Modal opened={opened} onClose={onClose} title="Edit endpoint" size="lg" centered>
       <Stack>
         <TextInput label="URL" value={url} onChange={(e) => setUrl(e.currentTarget.value)} />
         <TextInput label="Secret" value={secret} onChange={(e) => setSecret(e.currentTarget.value)} />
-        <Stack gap={4}>
-          <Text size="sm" fw={500}>Transformer</Text>
-          <Textarea
-            value={transformer}
-            onChange={(e) => setTransformer(e.currentTarget.value)}
-            rows={8}
-            styles={{ input: { fontFamily: "monospace", fontSize: 13 } }}
-          />
-          <Group justify="flex-end">
-            <Button size="xs" variant="light" loading={testing} onClick={runTest}>
-              Test with sample payload
-            </Button>
-          </Group>
-          {testResult && (
-            <Code block style={{ fontSize: 11, whiteSpace: "pre-wrap" }}>
-              {testResult.error
-                ? `ERROR:\n${testResult.error}`
-                : JSON.stringify(testResult.result, null, 2)}
-            </Code>
-          )}
-        </Stack>
+        <TransformerSection transformer={transformer} onTransformerChange={setTransformer} />
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>Cancel</Button>
           <Button onClick={() => mutation.mutate()} loading={mutation.isPending}>Save</Button>

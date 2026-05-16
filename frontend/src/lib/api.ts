@@ -25,9 +25,39 @@ export const getConversations = (params?: {
   return api.get("conversations/", { headers: authHeaders(), searchParams }).json();
 };
 
+export type FilterField = "title" | "content" | "meta" | "stats.word_count" | "stats.duration_seconds";
+export type FilterOp = "eq" | "contains" | "regex" | "gt" | "gte" | "lt" | "lte";
+
+export interface ConvFilter {
+  field: FilterField;
+  op: FilterOp;
+  value: string;
+  meta_key?: string;
+}
+
+export interface PagedConversations {
+  items: ConversationResponse[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export const searchConversations = (
+  params: { organization_id?: string; scope_id?: string; scope_type?: string },
+  body: { filters: ConvFilter[]; page: number; page_size: number; sort_by: string; sort_dir: number },
+): Promise<PagedConversations> => {
+  const searchParams = Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v != null),
+  ) as Record<string, string>;
+  return api
+    .post("conversations/search", { json: body, headers: authHeaders(), searchParams })
+    .json();
+};
+
 export const createConversation = (data: {
   title: string;
   content: string;
+  metadata?: { key: string; value: string }[];
   organization_id?: string;
   scope_id?: string;
   scope_type?: string;
@@ -214,7 +244,7 @@ export const listDeliveries = (orgId: string, epId: string): Promise<Delivery[]>
 export const testTransformer = (
   transformer: string,
   payload: Record<string, unknown>,
-): Promise<{ result: Record<string, unknown> | null; error: string | null }> =>
+): Promise<{ result: Record<string, unknown> | null; error: string | null; stdout: string }> =>
   api.post("webhooks/transformer/test", { json: { transformer, payload }, headers: authHeaders() }).json();
 
 // --- Imports ---
