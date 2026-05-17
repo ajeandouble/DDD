@@ -1,10 +1,9 @@
 from uuid import UUID
 
-from src.iam.domain.models import ApiKey, Group, Tag, User
+from src.iam.domain.models import ApiKey, Group, User
 from src.iam.domain.repositories import (
     ApiKeyRepository,
     GroupRepository,
-    TagRepository,
     UserRepository,
 )
 from src.shared.mongo_repository import MongoRepository
@@ -147,44 +146,3 @@ class MongoApiKeyRepository(MongoRepository, ApiKeyRepository):
 
     async def delete(self, key_id: UUID) -> None:
         await self._col.delete_one({"_id": key_id})
-
-
-# ---------------------------------------------------------------------------
-# Tag
-# ---------------------------------------------------------------------------
-
-
-def _tag_to_doc(tag: Tag) -> dict:
-    return {
-        "_id": tag.id,
-        "name": tag.name,
-        "org_id": tag.org_id,
-        "created_at": tag.created_at,
-    }
-
-
-def _tag_from_doc(doc: dict) -> Tag:
-    return Tag(
-        id=doc["_id"],
-        name=doc["name"],
-        org_id=doc["org_id"],
-        created_at=doc["created_at"],
-    )
-
-
-class MongoTagRepository(MongoRepository, TagRepository):
-    collection_name = "iam_tags"
-
-    async def save(self, tag: Tag) -> None:
-        await self._col.insert_one(_tag_to_doc(tag))
-
-    async def find_by_id(self, tag_id: UUID) -> Tag | None:
-        doc = await self._col.find_one({"_id": tag_id})
-        return _tag_from_doc(doc) if doc else None
-
-    async def find_by_org(self, org_id: UUID) -> list[Tag]:
-        docs = await self._col.find({"org_id": org_id}).to_list(length=500)
-        return [_tag_from_doc(d) for d in docs]
-
-    async def delete(self, tag_id: UUID) -> None:
-        await self._col.delete_one({"_id": tag_id})

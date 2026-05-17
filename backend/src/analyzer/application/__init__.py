@@ -1,12 +1,11 @@
 import asyncio
 import os
+from typing import Callable
 from uuid import UUID
-
-from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from src.analyzer.domain import AnalysisJob, Transcript, TranscriptSegment, TranscriptWord
 from src.analyzer.domain.events import TranscriptFailed, TranscriptReady
-from src.analyzer.infrastructure.repositories import MongoAnalysisJobRepository
+from src.analyzer.domain.repositories import AnalysisJobRepository
 from src.shared.events import publish
 
 _queue: asyncio.Queue[UUID] = asyncio.Queue()
@@ -53,8 +52,7 @@ async def enqueue(job_id: UUID) -> None:
     await _queue.put(job_id)
 
 
-async def _process_one(job_id: UUID, db: AsyncIOMotorDatabase) -> None:
-    repo = MongoAnalysisJobRepository(db)
+async def _process_one(job_id: UUID, repo: AnalysisJobRepository) -> None:
     job = await repo.find_by_id(job_id)
     if job is None:
         return
@@ -117,12 +115,12 @@ async def _process_one(job_id: UUID, db: AsyncIOMotorDatabase) -> None:
             await _queue.put(job_copy.id)
 
 
-async def worker(db: AsyncIOMotorDatabase) -> None:
+async def worker(repo_factory: Callable[[], AnalysisJobRepository]) -> None:
     print("[analyzer] worker started")
     while True:
         job_id = await _queue.get()
         try:
-            await _process_one(job_id, db)
+            await _process_one(job_id, repo_factory())
         except Exception as exc:
             print(f"[analyzer] unhandled error processing {job_id}: {exc}")
         finally:

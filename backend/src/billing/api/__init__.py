@@ -61,9 +61,8 @@ def _sub_resp(sub) -> SubscriptionResponse:
 
 
 async def _require_org_member(org_id: UUID, user: User, authz) -> None:
-    db = get_db()
-    org = await db["organizations"].find_one({"_id": org_id, "member_ids": user.id})
-    if org is None and not authz.is_superadmin(f"user:{user.id}"):
+    role = await authz.effective_role(f"user:{user.id}", "org", str(org_id), org_id=str(org_id))
+    if role is None and not authz.is_superadmin(f"user:{user.id}"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
 
 

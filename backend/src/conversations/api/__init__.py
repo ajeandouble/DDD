@@ -12,9 +12,16 @@ from src.conversations.application.commands import (
     UpdateConversationCommand,
 )
 from src.conversations.application.queries import ConversationQueryHandler
-from src.conversations.domain.models import Conversation, ConversationType, ScopeType
-from src.conversations.domain.repositories import ConversationFilter, ConversationRepository
-from src.conversations.infrastructure.repositories import MongoConversationRepository
+from src.conversations.domain.models import Conversation, ConversationType, ScopeType, Tag
+from src.conversations.domain.repositories import (
+    ConversationFilter,
+    ConversationRepository,
+    TagRepository,
+)
+from src.conversations.infrastructure.repositories import (
+    MongoConversationRepository,
+    MongoTagRepository,
+)
 from src.iam.application.authorization_service import AuthorizationService
 from src.iam.domain.models import Principal, User
 from src.shared.database import get_db
@@ -31,6 +38,10 @@ def _repo() -> ConversationRepository:
     return MongoConversationRepository(get_db())
 
 
+def _tag_repo() -> TagRepository:
+    return MongoTagRepository(get_db())
+
+
 def _commands(repo: ConversationRepository = Depends(_repo)) -> ConversationCommandHandler:
     return ConversationCommandHandler(repo)
 
@@ -40,6 +51,21 @@ def _queries(repo: ConversationRepository = Depends(_repo)) -> ConversationQuery
 
 
 # --- Schemas ---
+
+
+class TagCreate(BaseModel):
+    name: str
+
+
+class TagResponse(BaseModel):
+    id: UUID
+    name: str
+    org_id: UUID
+    created_at: str
+
+
+def _tag_resp(t: Tag) -> TagResponse:
+    return TagResponse(id=t.id, name=t.name, org_id=t.org_id, created_at=t.created_at.isoformat())
 
 
 class MetadataEntry(BaseModel):
@@ -295,3 +321,55 @@ async def delete_conversation(
         await commands.delete(conversation_id)
     except ConversationNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+
+# ---------------------------------------------------------------------------
+# Tags (org-scoped, used on conversations)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/organizations/{org_id}/tags", response_model=list[TagResponse])
+async def list_tags(
+    org_id: UUID,
+    user: User = Depends(get_current_user),
+    authz: AuthorizationService = Depends(get_authz),
+    repo: TagRepository = Depends(_tag_repo),
+):
+    if not await authz.can_do(f"user:{user.id}", "read", "org", str(org_id), org_id=str(org_id)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    return [_tag_resp(t) for t in await repo.find_by_org(org_id)]
+
+
+@router.post(
+    "/organizations/{org_id}/tags",
+    response_model=TagResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_tag(
+    org_id: UUID,
+    body: TagCreate,
+    user: User = Depends(get_current_user),
+    authz: AuthorizationService = Depends(get_authz),
+    repo: TagRepository = Depends(_tag_repo),
+):
+    if not await authz.can_do(f"user:{user.id}", "write", "org", str(org_id), org_id=str(org_id)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    tag = Tag.create(name=body.name, org_id=org_id)
+    await repo.save(tag)
+    return _tag_resp(tag)
+
+
+@router.delete("/organizations/{org_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_tag(
+    org_id: UUID,
+    tag_id: UUID,
+    user: User = Depends(get_current_user),
+    authz: AuthorizationService = Depends(get_authz),
+    repo: TagRepository = Depends(_tag_repo),
+):
+    if not await authz.can_do(f"user:{user.id}", "delete", "org", str(org_id), org_id=str(org_id)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    tag = await repo.find_by_id(tag_id)
+    if tag is None or tag.org_id != org_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    await repo.delete(tag_id)

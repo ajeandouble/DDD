@@ -17,6 +17,7 @@ class Subscription:
     tokens_used: int
     period_start: datetime
     owner_id: UUID
+    status: str = "active"
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
@@ -56,7 +57,11 @@ class Subscription:
     def upgrade(self, new_tier: str) -> None:
         if new_tier not in PLAN_LIMITS:
             raise ValueError(f"Unknown tier: {new_tier}")
+        if new_tier == self.tier:
+            return
         self.tier = new_tier
+        self.tokens_used = 0
+        self.period_start = datetime.now(timezone.utc)
 
     @staticmethod
     def compute_tokens(duration_seconds: float) -> int:

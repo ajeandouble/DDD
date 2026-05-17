@@ -8,6 +8,18 @@ ConversationType = Literal["review", "conversation"]
 
 
 @dataclass
+class Tag:
+    id: UUID
+    name: str
+    org_id: UUID
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @classmethod
+    def create(cls, name: str, org_id: UUID) -> "Tag":
+        return cls(id=uuid4(), name=name, org_id=org_id)
+
+
+@dataclass
 class ConversationStats:
     word_count: int | None = None
     duration_seconds: float | None = None
@@ -74,3 +86,14 @@ class Conversation:
 
     def update_stats(self, stats: ConversationStats) -> None:
         self.stats = stats
+
+    def apply_transcript(
+        self, speaker_turns: list[dict], word_count: int, duration_seconds: float
+    ) -> None:
+        self.type = "conversation"
+        self.content = speaker_turns
+        self.stats = ConversationStats(
+            word_count=word_count,
+            duration_seconds=duration_seconds,
+            cost_cents=self.stats.cost_cents,
+        )

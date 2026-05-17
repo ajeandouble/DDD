@@ -95,17 +95,5 @@ class ApiKey:
         return hashlib.sha256(raw_key.encode()).hexdigest()
 
 
-@dataclass
-class Tag:
-    id: UUID
-    name: str
-    org_id: UUID
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-    @classmethod
-    def create(cls, name: str, org_id: UUID) -> "Tag":
-        return cls(id=uuid4(), name=name, org_id=org_id)
-
-
 # Union type for request authentication
 Principal = User | ApiKey

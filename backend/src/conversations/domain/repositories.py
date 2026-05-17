@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 from uuid import UUID
 
-from src.conversations.domain.models import Conversation
+from src.conversations.domain.models import Conversation, Tag
 
 
 @dataclass
@@ -58,3 +58,17 @@ class ConversationRepository(ABC):
 
     @abstractmethod
     async def delete(self, conversation_id: UUID) -> None: ...
+
+
+class TagRepository(ABC):
+    @abstractmethod
+    async def save(self, tag: Tag) -> None: ...
+
+    @abstractmethod
+    async def find_by_id(self, tag_id: UUID) -> Tag | None: ...
+
+    @abstractmethod
+    async def find_by_org(self, org_id: UUID) -> list[Tag]: ...
+
+    @abstractmethod
+    async def delete(self, tag_id: UUID) -> None: ...

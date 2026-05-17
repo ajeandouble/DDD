@@ -9,6 +9,7 @@ from src.analyzer.domain import (
     TranscriptSegment,
     TranscriptWord,
 )
+from src.analyzer.domain.repositories import AnalysisJobRepository
 
 
 def _to_doc(job: AnalysisJob) -> dict:
@@ -83,7 +84,7 @@ def _from_doc(doc: dict) -> AnalysisJob:
     )
 
 
-class MongoAnalysisJobRepository:
+class MongoAnalysisJobRepository(AnalysisJobRepository):
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         self._col = db["analysis_jobs"]
 

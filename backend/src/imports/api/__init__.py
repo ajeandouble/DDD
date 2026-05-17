@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
-from src.billing.application.quota_service import QuotaExceeded
+from src.shared.exceptions import QuotaExceeded
 from src.imports.application import store_file
 from src.imports.domain.events import FileIngested
 from src.imports.domain.models import ImportJob

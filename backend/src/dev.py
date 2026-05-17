@@ -75,13 +75,14 @@ async def seed():
     from src.conversations.infrastructure.repositories import MongoConversationRepository
     from src.iam.application.auth_service import AuthService
     from src.iam.application.authorization_service import AuthorizationService
-    from src.iam.domain.models import Group, Tag
+    from src.iam.domain.models import Group
+    from src.conversations.domain.models import Tag
     from src.iam.infrastructure.enforcer import get_enforcer
     from src.iam.infrastructure.repositories import (
         MongoGroupRepository,
-        MongoTagRepository,
         MongoUserRepository,
     )
+    from src.conversations.infrastructure.repositories import MongoTagRepository
     from src.scopes.application.commands import (
         CampaignCommandHandler,
         CreateCampaignCommand,

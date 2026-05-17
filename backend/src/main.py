@@ -14,9 +14,11 @@ from src.iam.api.authz import router as authz_router
 from src.iam.application.event_handlers import register_handlers as register_iam_handlers
 from src.scopes.application.event_handlers import register_handlers as register_scopes_handlers
 from src.analyzer.application.event_handlers import register_handlers as register_analyzer_handlers
+from src.analyzer.infrastructure.repositories import MongoAnalysisJobRepository
 from src.conversations.application.event_handlers import (
     register_handlers as register_conversation_handlers,
 )
+from src.conversations.infrastructure.repositories import MongoConversationRepository
 from src.iam.infrastructure.enforcer import init_enforcer
 from src.conversations.api import router as conversations_router
 from src.imports.api import router as imports_router
@@ -27,6 +29,10 @@ from src.webhooks.api import router as webhooks_router
 from src.webhooks.application import register_handlers as register_webhook_handlers
 from src.billing.api import router as billing_router
 from src.billing.application.event_handlers import register_handlers as register_billing_handlers
+from src.billing.infrastructure.repositories import (
+    MongoSubscriptionRepository,
+    MongoUsageRepository,
+)
 import src.analyzer.application as analyzer_worker
 
 
@@ -36,11 +42,18 @@ async def lifespan(app: FastAPI):
     await init_enforcer(database.get_db())
     register_iam_handlers()
     register_scopes_handlers()
-    register_analyzer_handlers()
-    register_conversation_handlers()
+    register_analyzer_handlers(repo_factory=lambda: MongoAnalysisJobRepository(database.get_db()))
+    register_conversation_handlers(
+        repo_factory=lambda: MongoConversationRepository(database.get_db())
+    )
     register_webhook_handlers()
-    register_billing_handlers()
-    task = asyncio.create_task(analyzer_worker.worker(database.get_db()))
+    register_billing_handlers(
+        sub_repo_factory=lambda: MongoSubscriptionRepository(database.get_db()),
+        usage_repo_factory=lambda: MongoUsageRepository(database.get_db()),
+    )
+    task = asyncio.create_task(
+        analyzer_worker.worker(repo_factory=lambda: MongoAnalysisJobRepository(database.get_db()))
+    )
     yield
     task.cancel()
     await database.disconnect()

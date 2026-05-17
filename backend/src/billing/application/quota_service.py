@@ -2,14 +2,9 @@ from uuid import UUID
 
 from src.billing.domain.models import PLAN_LIMITS
 from src.billing.domain.repositories import SubscriptionRepository
+from src.shared.exceptions import QuotaExceeded, WebhookAccessDenied
 
-
-class QuotaExceeded(Exception):
-    pass
-
-
-class WebhookAccessDenied(Exception):
-    pass
+__all__ = ["QuotaExceeded", "WebhookAccessDenied", "QuotaService"]
 
 
 class QuotaService:

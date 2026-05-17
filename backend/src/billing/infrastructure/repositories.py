@@ -20,6 +20,7 @@ def _sub_from_doc(doc: dict) -> Subscription:
         period_start=_ensure_tz(doc["period_start"]),
         owner_id=UUID(doc["owner_id"]),
         created_at=_ensure_tz(doc["created_at"]),
+        status=doc.get("status", "active"),
     )
 
 
@@ -32,6 +33,7 @@ def _sub_to_doc(sub: Subscription) -> dict:
         "period_start": sub.period_start,
         "owner_id": str(sub.owner_id),
         "created_at": sub.created_at,
+        "status": sub.status,
     }
 
 

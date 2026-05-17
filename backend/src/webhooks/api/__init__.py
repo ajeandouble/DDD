@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from src.iam.application.authorization_service import AuthorizationService
 from src.iam.domain.models import User
 from src.shared.database import get_db
-from src.billing.application.quota_service import WebhookAccessDenied
+from src.shared.exceptions import WebhookAccessDenied
 from src.shared.deps import get_authz, get_current_user, get_quota_service
 from src.webhooks.application import run_transformer
 from src.webhooks.domain import WebhookEndpoint

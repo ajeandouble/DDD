@@ -4,11 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from src.iam.application.authorization_service import AuthorizationService, NotAuthorized
-from src.iam.domain.models import ApiKey, Group, Role, Tag, User
+from src.iam.domain.models import ApiKey, Group, Role, User
 from src.iam.infrastructure.repositories import (
     MongoApiKeyRepository,
     MongoGroupRepository,
-    MongoTagRepository,
 )
 from src.shared.database import get_db
 from src.shared.deps import get_authz, get_current_user
@@ -27,10 +26,6 @@ def _group_repo() -> MongoGroupRepository:
 
 def _apikey_repo() -> MongoApiKeyRepository:
     return MongoApiKeyRepository(get_db())
-
-
-def _tag_repo() -> MongoTagRepository:
-    return MongoTagRepository(get_db())
 
 
 # ---------------------------------------------------------------------------
@@ -90,17 +85,6 @@ class ApiKeyCreatedResponse(ApiKeyResponse):
     raw_key: str
 
 
-class TagCreate(BaseModel):
-    name: str
-
-
-class TagResponse(BaseModel):
-    id: UUID
-    name: str
-    org_id: UUID
-    created_at: str
-
-
 class UserSummaryResponse(BaseModel):
     id: UUID
     email: str
@@ -138,15 +122,6 @@ def _apikey_resp(k: ApiKey) -> ApiKeyResponse:
         scope_type=k.scope_type,
         scope_id=k.scope_id,
         created_at=k.created_at.isoformat(),
-    )
-
-
-def _tag_resp(t: Tag) -> TagResponse:
-    return TagResponse(
-        id=t.id,
-        name=t.name,
-        org_id=t.org_id,
-        created_at=t.created_at.isoformat(),
     )
 
 
@@ -522,55 +497,3 @@ async def my_roles(
         subprojects=subproject_roles,
         campaigns=campaign_roles,
     )
-
-
-# ---------------------------------------------------------------------------
-# Tags
-# ---------------------------------------------------------------------------
-
-
-@router.get("/organizations/{org_id}/tags", response_model=list[TagResponse])
-async def list_tags(
-    org_id: UUID,
-    user: User = Depends(get_current_user),
-    authz: AuthorizationService = Depends(get_authz),
-    repo: MongoTagRepository = Depends(_tag_repo),
-):
-    if not await authz.can_do(f"user:{user.id}", "read", "org", str(org_id), org_id=str(org_id)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
-    return [_tag_resp(t) for t in await repo.find_by_org(org_id)]
-
-
-@router.post(
-    "/organizations/{org_id}/tags",
-    response_model=TagResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_tag(
-    org_id: UUID,
-    body: TagCreate,
-    user: User = Depends(get_current_user),
-    authz: AuthorizationService = Depends(get_authz),
-    repo: MongoTagRepository = Depends(_tag_repo),
-):
-    if not await authz.can_do(f"user:{user.id}", "write", "org", str(org_id), org_id=str(org_id)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
-    tag = Tag.create(name=body.name, org_id=org_id)
-    await repo.save(tag)
-    return _tag_resp(tag)
-
-
-@router.delete("/organizations/{org_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_tag(
-    org_id: UUID,
-    tag_id: UUID,
-    user: User = Depends(get_current_user),
-    authz: AuthorizationService = Depends(get_authz),
-    repo: MongoTagRepository = Depends(_tag_repo),
-):
-    if not await authz.can_do(f"user:{user.id}", "delete", "org", str(org_id), org_id=str(org_id)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
-    tag = await repo.find_by_id(tag_id)
-    if tag is None or tag.org_id != org_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    await repo.delete(tag_id)
