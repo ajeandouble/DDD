@@ -1,6 +1,11 @@
 from uuid import UUID
 
-from src.billing.domain.events import QuotaExhausted, SubscriptionCreated, SubscriptionUpgraded, UsageRecorded
+from src.billing.domain.events import (
+    QuotaExhausted,
+    SubscriptionCreated,
+    SubscriptionUpgraded,
+    UsageRecorded,
+)
 from src.billing.domain.models import Subscription, UsageRecord
 from src.billing.domain.repositories import SubscriptionRepository, UsageRepository
 from src.shared.events import publish
