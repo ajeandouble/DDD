@@ -9,7 +9,9 @@ import src.analyzer.application as worker_module
 
 async def on_file_ingested(event: FileIngested) -> None:
     db = get_db()
-    repo = MongoAnalysisJobRepository(db)
+    repo = MongoAnalysisJobRepository(
+        db
+    )  # FIXME: Mongo directly referenced! Need an interface, imeplementation dependant
     job = AnalysisJob.create(
         import_job_id=event.job_id,
         conversation_id=event.conversation_id,

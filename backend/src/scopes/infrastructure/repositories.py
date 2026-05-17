@@ -154,7 +154,9 @@ def _campaign_to_doc(c: Campaign) -> dict:
     return {
         "_id": c.id,
         "name": c.name,
-        "subproject_id": c.subproject_id,
+        "parent_type": c.parent_type,
+        "parent_id": c.parent_id,
+        "organization_id": c.organization_id,
         "created_at": c.created_at,
     }
 
@@ -163,7 +165,9 @@ def _campaign_from_doc(doc: dict) -> Campaign:
     return Campaign(
         id=doc["_id"],
         name=doc["name"],
-        subproject_id=doc["subproject_id"],
+        parent_type=doc["parent_type"],
+        parent_id=doc["parent_id"],
+        organization_id=doc["organization_id"],
         created_at=doc["created_at"],
     )
 
@@ -178,8 +182,8 @@ class MongoCampaignRepository(MongoRepository, CampaignRepository):
         doc = await self._col.find_one({"_id": campaign_id})
         return _campaign_from_doc(doc) if doc else None
 
-    async def find_by_subproject(self, subproject_id: UUID) -> list[Campaign]:
-        docs = await self._col.find({"subproject_id": subproject_id}).to_list(length=100)
+    async def find_by_parent(self, parent_id: UUID) -> list[Campaign]:
+        docs = await self._col.find({"parent_id": parent_id}).to_list(length=100)
         return [_campaign_from_doc(d) for d in docs]
 
     async def update(self, campaign: Campaign) -> None:

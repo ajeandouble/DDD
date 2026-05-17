@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from src.conversations.domain.models import Conversation, ScopeType
-from src.conversations.domain.repositories import ConversationRepository
+from src.conversations.domain.repositories import ConversationFilter, ConversationRepository, PagedResult
 
 
 class ConversationQueryHandler:
@@ -23,4 +23,26 @@ class ConversationQueryHandler:
             organization_id=organization_id,
             scope_id=scope_id,
             scope_type=scope_type,
+        )
+
+    async def search(
+        self,
+        organization_id: UUID | None,
+        scope_id: UUID | None,
+        scope_type: ScopeType | None,
+        filters: list[ConversationFilter],
+        page: int,
+        page_size: int,
+        sort_by: str = "timestamp",
+        sort_dir: int = -1,
+    ) -> PagedResult:
+        return await self._repo.search(
+            organization_id=organization_id,
+            scope_id=scope_id,
+            scope_type=scope_type,
+            filters=filters,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )

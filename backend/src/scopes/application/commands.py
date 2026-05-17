@@ -150,7 +150,8 @@ class SubprojectCommandHandler:
 @dataclass
 class CreateCampaignCommand:
     name: str
-    subproject_id: UUID
+    parent_type: str  # "organization" | "project" | "subproject"
+    parent_id: UUID
     org_id: UUID
     requesting_user_id: UUID
 
@@ -159,11 +160,9 @@ class CampaignCommandHandler:
     def __init__(
         self,
         campaign_repo: CampaignRepository,
-        subproject_repo: SubprojectRepository,
         org_repo: OrganizationRepository,
     ) -> None:
         self._repo = campaign_repo
-        self._subproject_repo = subproject_repo
         self._org_repo = org_repo
 
     async def create(self, cmd: CreateCampaignCommand) -> Campaign:
@@ -172,12 +171,21 @@ class CampaignCommandHandler:
             raise ScopeNotFound(cmd.org_id)
         if not org.is_member(cmd.requesting_user_id):
             raise NotAMember(cmd.requesting_user_id)
-        sp = await self._subproject_repo.find_by_id(cmd.subproject_id)
-        if sp is None:
-            raise ScopeNotFound(cmd.subproject_id)
-        campaign = Campaign.create(name=cmd.name, subproject_id=cmd.subproject_id)
+        campaign = Campaign.create(
+            name=cmd.name,
+            parent_type=cmd.parent_type,
+            parent_id=cmd.parent_id,
+            organization_id=cmd.org_id,
+        )
         await self._repo.save(campaign)
-        await publish(CampaignCreated(campaign_id=campaign.id, subproject_id=cmd.subproject_id))
+        await publish(
+            CampaignCreated(
+                campaign_id=campaign.id,
+                parent_type=cmd.parent_type,
+                parent_id=cmd.parent_id,
+                organization_id=cmd.org_id,
+            )
+        )
         return campaign
 
     async def delete(self, campaign_id: UUID) -> None:

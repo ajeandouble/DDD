@@ -1,14 +1,11 @@
 """
-Playground seed — full IAM + scopes + conversations fixture.
+Dev seed — drops all data and recreates full fixtures.
 
 Run from backend/:
     uv run python scripts/seed_dev.py
-
-Requires a running MongoDB and a .env file (defaults to .env).
-Drops and recreates all data on each run.
 """
 import asyncio
-import os
+import random
 import sys
 from pathlib import Path
 
@@ -17,8 +14,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env.dev")
-
-# ── bootstrap ────────────────────────────────────────────────────────────────
 
 from src.shared.database import connect, disconnect, get_db
 from src.iam.application.event_handlers import register_handlers as register_iam_handlers
@@ -54,8 +49,6 @@ from src.conversations.application.commands import (
 )
 from src.conversations.infrastructure.repositories import MongoConversationRepository
 
-# ── users ────────────────────────────────────────────────────────────────────
-
 _PASSWORD = "abcd1234"
 
 _USERS = [
@@ -72,7 +65,17 @@ _USERS = [
     ("judy@ddd.dev",       _PASSWORD, "no role — locked out of org"),
 ]
 
-# ── main ─────────────────────────────────────────────────────────────────────
+_TOPICS = [
+    "Customer interview", "Product feedback", "Sales call", "Support escalation",
+    "Team standup", "Design review", "Sprint planning", "Bug triage",
+    "Onboarding session", "Contract negotiation", "Partnership call",
+    "User research", "Investor update", "Board meeting", "All-hands",
+    "Post-mortem", "Stakeholder sync", "Quarterly review", "Feature walkthrough",
+    "Demo call",
+]
+
+_AGENTS = ["Alice", "Bob", "Carol", "Dave", "Eve", "Frank", "Grace", "Henry"]
+
 
 async def main() -> None:
     await connect()
@@ -80,9 +83,7 @@ async def main() -> None:
     register_iam_handlers()
     register_scopes_handlers()
 
-    # Wipe existing data so the script is idempotent via full reset
-    collections = await db.list_collection_names()
-    for col in collections:
+    for col in await db.list_collection_names():
         await db[col].drop()
     print("Dropped all collections.")
 
@@ -91,7 +92,6 @@ async def main() -> None:
     user_repo = MongoUserRepository(db)
     auth_svc = AuthService(user_repo)
 
-    # ── users ────────────────────────────────────────────────────────────────
     for email, password, desc in _USERS:
         await auth_svc.register(email, password)
         print(f"  user  {email:30s}  ({desc})")
@@ -109,9 +109,7 @@ async def main() -> None:
     ivan   = users["ivan@ddd.dev"]
 
     await authz.grant_superadmin(superadmin.id)
-    print(f"\n  superadmin granted to {superadmin.email}")
 
-    # ── scope hierarchy ──────────────────────────────────────────────────────
     org = await OrganizationCommandHandler(MongoOrganizationRepository(db)).create(
         CreateOrganizationCommand(name="Acme Corp", owner_id=alice.id)
     )
@@ -125,11 +123,21 @@ async def main() -> None:
     ).create(CreateSubprojectCommand(
         name="Frontend", project_id=project.id, org_id=org.id, requesting_user_id=alice.id,
     ))
-    campaign = await CampaignCommandHandler(
-        MongoCampaignRepository(db), MongoSubprojectRepository(db), MongoOrganizationRepository(db)
-    ).create(CreateCampaignCommand(
-        name="Q1 2025 Launch", subproject_id=subproject.id, org_id=org.id,
-        requesting_user_id=alice.id,
+
+    campaign_handler = CampaignCommandHandler(MongoCampaignRepository(db), MongoOrganizationRepository(db))
+
+    # Campaigns at each hierarchy level
+    await campaign_handler.create(CreateCampaignCommand(
+        name="Brand Awareness", parent_type="organization", parent_id=org.id,
+        org_id=org.id, requesting_user_id=alice.id,
+    ))
+    await campaign_handler.create(CreateCampaignCommand(
+        name="Lead Generation", parent_type="project", parent_id=project.id,
+        org_id=org.id, requesting_user_id=alice.id,
+    ))
+    campaign = await campaign_handler.create(CreateCampaignCommand(
+        name="Q1 2025 Launch", parent_type="subproject", parent_id=subproject.id,
+        org_id=org.id, requesting_user_id=alice.id,
     ))
 
     oid = str(org.id)
@@ -140,9 +148,8 @@ async def main() -> None:
     print(f"\n  org        {oid}  Acme Corp")
     print(f"  project    {pid}  Website Redesign")
     print(f"  subproject {sid}  Frontend")
-    print(f"  campaign   {cid}  Q1 2025 Launch")
+    print(f"  campaign   {cid}  Q1 2025 Launch  (100 conversations)")
 
-    # ── individual role assignments ──────────────────────────────────────────
     await authz.assign_role(f"user:{bob.id}",   "supervisor", "org",        oid)
     await authz.assign_role(f"user:{carol.id}",  "editor",     "project",    pid)
     await authz.assign_role(f"user:{dave.id}",   "viewer",     "campaign",   cid)
@@ -151,66 +158,52 @@ async def main() -> None:
     await authz.assign_role(f"user:{grace.id}",  "viewer",     "project",    pid)
     await authz.assign_role(f"user:{henry.id}",  "editor",     "campaign",   cid)
     await authz.assign_role(f"user:{ivan.id}",   "viewer",     "org",        oid)
-    print("\n  individual roles assigned")
 
-    # ── groups ───────────────────────────────────────────────────────────────
     group_repo = MongoGroupRepository(db)
-
     design_team = Group.create(name="Design Team", org_id=org.id)
     design_team.add_member(carol.id)
     design_team.add_member(grace.id)
     await group_repo.save(design_team)
     await authz.assign_role(f"group:{design_team.id}", "editor", "org", oid)
-    print(f"  group Design Team ({design_team.id}) — carol, grace → editor@org")
 
     ops_team = Group.create(name="Ops Team", org_id=org.id)
     ops_team.add_member(bob.id)
     ops_team.add_member(eve.id)
     await group_repo.save(ops_team)
     await authz.assign_role(f"group:{ops_team.id}", "supervisor", "org", oid)
-    print(f"  group Ops Team    ({ops_team.id}) — bob, eve → supervisor@org")
 
-    # ── tags ─────────────────────────────────────────────────────────────────
     tag_repo = MongoTagRepository(db)
     tags = {}
     for name in ("urgent", "design", "technical", "review", "blocked"):
         t = Tag.create(name=name, org_id=org.id)
         await tag_repo.save(t)
         tags[name] = t
-    print(f"\n  tags: {', '.join(tags)}")
 
-    # ── conversations ────────────────────────────────────────────────────────
     conv = ConversationCommandHandler(MongoConversationRepository(db))
+    creators = [alice, bob, carol, dave, eve, frank, grace, henry]
+    tag_list = list(tags.values())
 
-    convs = [
-        ("Q1 Strategy",              alice.id,  "organization", None,        ["urgent"]),
-        ("Hiring Plan",              frank.id,  "organization", None,        ["review"]),
-        ("Tech Stack Decision",      bob.id,    "project",      project.id,  ["technical"]),
-        ("API Contract Review",      carol.id,  "project",      project.id,  ["review", "technical"]),
-        ("Component Library",        carol.id,  "subproject",   subproject.id, ["design", "technical"]),
-        ("Accessibility Audit",      grace.id,  "subproject",   subproject.id, ["blocked", "design"]),
-        ("Launch Checklist",         henry.id,  "campaign",     campaign.id, ["urgent"]),
-        ("Post-launch Retrospective",eve.id,    "campaign",     campaign.id, ["review"]),
-    ]
-
-    for title, creator, scope_type, scope_id, tag_names in convs:
+    random.seed(42)
+    for i in range(100):
+        topic = _TOPICS[i % len(_TOPICS)]
+        agent = _AGENTS[i % len(_AGENTS)]
+        creator = creators[i % len(creators)]
+        selected_tags = random.sample(tag_list, random.randint(0, 2))
         await conv.create(CreateConversationCommand(
-            title=title,
-            content=f"Seeded conversation: {title}.",
-            created_by=creator,
+            title=f"{topic} — {agent} #{i + 1:02d}",
+            content=f"Transcript of {topic.lower()} with {agent}.",
+            created_by=creator.id,
             organization_id=org.id,
-            scope_id=scope_id,
-            scope_type=scope_type,
-            tag_ids=[tags[n].id for n in tag_names],
+            scope_id=campaign.id,
+            scope_type="campaign",
+            tag_ids=[t.id for t in selected_tags],
         ))
-    print(f"  {len(convs)} conversations created")
+    print(f"  100 conversations created on Q1 2025 Launch")
 
-    # ── summary ──────────────────────────────────────────────────────────────
     print("\n" + "─" * 60)
     print(f"Seed complete. Password for all accounts: {_PASSWORD}")
     for email, _, desc in _USERS:
         print(f"  {email:30s}  {desc}")
-    print(f"\nOrg ID: {oid}")
 
     await disconnect()
 

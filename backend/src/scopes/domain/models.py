@@ -1,6 +1,9 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Literal
 from uuid import UUID, uuid4
+
+CampaignParentType = Literal["organization", "project", "subproject"]
 
 
 @dataclass
@@ -54,10 +57,18 @@ class Subproject:
 @dataclass
 class Campaign:
     name: str
-    subproject_id: UUID
+    parent_type: CampaignParentType
+    parent_id: UUID
+    organization_id: UUID
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
-    def create(cls, name: str, subproject_id: UUID) -> "Campaign":
-        return cls(name=name, subproject_id=subproject_id)
+    def create(
+        cls,
+        name: str,
+        parent_type: CampaignParentType,
+        parent_id: UUID,
+        organization_id: UUID,
+    ) -> "Campaign":
+        return cls(name=name, parent_type=parent_type, parent_id=parent_id, organization_id=organization_id)

@@ -1,9 +1,9 @@
 import json
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from src.conversations.application.commands import (
     ConversationCommandHandler,
@@ -13,7 +13,7 @@ from src.conversations.application.commands import (
 )
 from src.conversations.application.queries import ConversationQueryHandler
 from src.conversations.domain.models import Conversation, ScopeType
-from src.conversations.domain.repositories import ConversationRepository
+from src.conversations.domain.repositories import ConversationFilter, ConversationRepository
 from src.conversations.infrastructure.repositories import MongoConversationRepository
 from src.iam.application.authorization_service import AuthorizationService
 from src.iam.domain.models import Principal, User
@@ -59,8 +59,8 @@ class ConversationCreate(BaseModel):
     metadata: list[MetadataEntry] = []
     emit_webhook: bool = False
     organization_id: UUID | None = None
-    scope_id: UUID | None = None
-    scope_type: ScopeType | None = None
+    scope_id: UUID
+    scope_type: Literal["campaign"] = "campaign"
     tag_ids: list[UUID] = []
 
 
@@ -84,6 +84,28 @@ class ConversationResponse(BaseModel):
     scope_type: ScopeType | None
     tag_ids: list[UUID]
     stats: StatsResponse
+
+
+class FilterInput(BaseModel):
+    field: Literal["title", "content", "meta", "stats.word_count", "stats.duration_seconds"]
+    op: Literal["eq", "contains", "regex", "gt", "gte", "lt", "lte"]
+    value: str
+    meta_key: str = ""
+
+
+class SearchBody(BaseModel):
+    filters: list[FilterInput] = []
+    page: int = 1
+    page_size: int = 20
+    sort_by: str = "timestamp"
+    sort_dir: int = -1  # -1 = desc, 1 = asc
+
+
+class PagedConversations(BaseModel):
+    items: list[ConversationResponse]
+    total: int
+    page: int
+    page_size: int
 
 
 def _parse_content(raw: str) -> Any:
@@ -162,6 +184,36 @@ async def list_conversations(
             scope_type=scope_type,
         )
     ]
+
+
+@router.post("/search", response_model=PagedConversations)
+async def search_conversations(
+    body: SearchBody,
+    organization_id: UUID | None = Query(None),
+    scope_id: UUID | None = Query(None),
+    scope_type: ScopeType | None = Query(None),
+    queries: ConversationQueryHandler = Depends(_queries),
+):
+    filters = [
+        ConversationFilter(field=f.field, op=f.op, value=f.value, meta_key=f.meta_key)
+        for f in body.filters
+    ]
+    result = await queries.search(
+        organization_id=organization_id,
+        scope_id=scope_id,
+        scope_type=scope_type,
+        filters=filters,
+        page=body.page,
+        page_size=body.page_size,
+        sort_by=body.sort_by,
+        sort_dir=body.sort_dir,
+    )
+    return PagedConversations(
+        items=[_to_response(c) for c in result.items],
+        total=result.total,
+        page=result.page,
+        page_size=result.page_size,
+    )
 
 
 @router.get("/{conversation_id}", response_model=ConversationResponse)

@@ -404,9 +404,8 @@ async def list_role_assignments(
             async for doc in db["subprojects"].find({"project_id": pid}, {"_id": 1}):
                 subproject_ids.append(doc["_id"])
         domains.extend(f"subproject:{sid}" for sid in subproject_ids)
-        for sid in subproject_ids:
-            async for doc in db["campaigns"].find({"subproject_id": sid}, {"_id": 1}):
-                domains.append(f"campaign:{doc['_id']}")
+        async for doc in db["campaigns"].find({"organization_id": org_id}, {"_id": 1}):
+            domains.append(f"campaign:{doc['_id']}")
 
     results = []
     async for doc in db["casbin_rules"].find({"rule.2": {"$in": domains}}):
@@ -466,10 +465,9 @@ async def my_roles(
     }
 
     campaign_roles: dict[str, str | None] = {}
-    for sid in subproject_ids:
-        async for doc in db["campaigns"].find({"subproject_id": sid}, {"_id": 1}):
-            cid = doc["_id"]
-            campaign_roles[str(cid)] = await authz.effective_role(subject, "campaign", str(cid), org_id=oid)
+    async for doc in db["campaigns"].find({"organization_id": org_id}, {"_id": 1}):
+        cid = doc["_id"]
+        campaign_roles[str(cid)] = await authz.effective_role(subject, "campaign", str(cid), org_id=oid)
 
     return MyRolesResponse(
         org=org_role,

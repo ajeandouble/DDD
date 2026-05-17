@@ -21,6 +21,8 @@ from src.imports.api import router as imports_router
 from src.scopes.api import router as scopes_router
 from src.analyzer.api import router as analyzer_router
 from src.storage.api import router as storage_router
+from src.webhooks.api import router as webhooks_router
+from src.webhooks.application import register_handlers as register_webhook_handlers
 import src.analyzer.application as analyzer_worker
 
 
@@ -32,6 +34,7 @@ async def lifespan(app: FastAPI):
     register_scopes_handlers()
     register_analyzer_handlers()
     register_conversation_handlers()
+    register_webhook_handlers()
     task = asyncio.create_task(analyzer_worker.worker(database.get_db()))
     yield
     task.cancel()
@@ -57,6 +60,7 @@ app.include_router(imports_router)
 app.include_router(scopes_router)
 app.include_router(analyzer_router)
 app.include_router(storage_router)
+app.include_router(webhooks_router)
 
 
 @app.get("/health")

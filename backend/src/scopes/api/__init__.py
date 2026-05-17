@@ -85,10 +85,9 @@ def _subproject_commands(
 
 def _campaign_commands(
     campaign_repo: CampaignRepository = Depends(_campaign_repo),
-    subproject_repo: SubprojectRepository = Depends(_subproject_repo),
     org_repo: OrganizationRepository = Depends(_org_repo),
 ) -> CampaignCommandHandler:
-    return CampaignCommandHandler(campaign_repo, subproject_repo, org_repo)
+    return CampaignCommandHandler(campaign_repo, org_repo)
 
 
 def _org_queries(
@@ -163,7 +162,9 @@ class SubprojectResponse(BaseModel):
 class CampaignResponse(BaseModel):
     id: UUID
     name: str
-    subproject_id: UUID
+    parent_type: str
+    parent_id: UUID
+    organization_id: UUID
     created_at: str
 
 
@@ -199,7 +200,9 @@ def _campaign_resp(c: Campaign) -> CampaignResponse:
     return CampaignResponse(
         id=c.id,
         name=c.name,
-        subproject_id=c.subproject_id,
+        parent_type=c.parent_type,
+        parent_id=c.parent_id,
+        organization_id=c.organization_id,
         created_at=c.created_at.isoformat(),
     )
 
@@ -319,6 +322,56 @@ async def create_project(
     return _project_resp(project)
 
 
+# --- Campaigns under organization ---
+
+
+@router.get("/organizations/{org_id}/campaigns/", response_model=list[CampaignResponse])
+async def list_org_campaigns(
+    org_id: UUID,
+    queries: CampaignQueryHandler = Depends(_campaign_queries),
+):
+    return [_campaign_resp(c) for c in await queries.list_by_parent(org_id)]
+
+
+@router.post(
+    "/organizations/{org_id}/campaigns/",
+    response_model=CampaignResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_org_campaign(
+    org_id: UUID,
+    body: CampaignCreate,
+    commands: CampaignCommandHandler = Depends(_campaign_commands),
+    org_queries: OrganizationQueryHandler = Depends(_org_queries),
+    principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    org = await org_queries.get_by_id(org_id)
+    if org is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
+    subj = principal_subject(principal)
+    owner_id = principal.id if isinstance(principal, User) else principal.owner_id
+    await _require(await authz.can_do(subj, "write", "org", str(org_id), org_id=str(org_id)))
+    try:
+        c = await commands.create(
+            CreateCampaignCommand(
+                name=body.name,
+                parent_type="organization",
+                parent_id=org_id,
+                org_id=org_id,
+                requesting_user_id=owner_id,
+            )
+        )
+    except ScopeNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    except NotAMember:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a member")
+    return _campaign_resp(c)
+
+
+# --- Projects ---
+
+
 @router.get("/projects/{project_id}", response_model=ProjectResponse)
 async def get_project(
     project_id: UUID,
@@ -378,6 +431,60 @@ async def create_subproject(
     return _subproject_resp(sp)
 
 
+# --- Campaigns under project ---
+
+
+@router.get("/projects/{project_id}/campaigns/", response_model=list[CampaignResponse])
+async def list_project_campaigns(
+    project_id: UUID,
+    queries: CampaignQueryHandler = Depends(_campaign_queries),
+):
+    return [_campaign_resp(c) for c in await queries.list_by_parent(project_id)]
+
+
+@router.post(
+    "/projects/{project_id}/campaigns/",
+    response_model=CampaignResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_project_campaign(
+    project_id: UUID,
+    body: CampaignCreate,
+    commands: CampaignCommandHandler = Depends(_campaign_commands),
+    project_queries: ProjectQueryHandler = Depends(_project_queries),
+    principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    project = await project_queries.get_by_id(project_id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    subj = principal_subject(principal)
+    owner_id = principal.id if isinstance(principal, User) else principal.owner_id
+    await _require(
+        await authz.can_do(
+            subj, "write", "project", str(project_id), org_id=str(project.organization_id)
+        )
+    )
+    try:
+        c = await commands.create(
+            CreateCampaignCommand(
+                name=body.name,
+                parent_type="project",
+                parent_id=project_id,
+                org_id=project.organization_id,
+                requesting_user_id=owner_id,
+            )
+        )
+    except ScopeNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    except NotAMember:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a member")
+    return _campaign_resp(c)
+
+
+# --- Subprojects ---
+
+
 @router.get("/subprojects/{subproject_id}", response_model=SubprojectResponse)
 async def get_subproject(
     subproject_id: UUID,
@@ -389,15 +496,15 @@ async def get_subproject(
     return _subproject_resp(sp)
 
 
-# --- Campaigns ---
+# --- Campaigns under subproject ---
 
 
 @router.get("/subprojects/{subproject_id}/campaigns/", response_model=list[CampaignResponse])
-async def list_campaigns(
+async def list_subproject_campaigns(
     subproject_id: UUID,
     queries: CampaignQueryHandler = Depends(_campaign_queries),
 ):
-    return [_campaign_resp(c) for c in await queries.list_by_subproject(subproject_id)]
+    return [_campaign_resp(c) for c in await queries.list_by_parent(subproject_id)]
 
 
 @router.post(
@@ -405,7 +512,7 @@ async def list_campaigns(
     response_model=CampaignResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_campaign(
+async def create_subproject_campaign(
     subproject_id: UUID,
     body: CampaignCreate,
     commands: CampaignCommandHandler = Depends(_campaign_commands),
@@ -423,13 +530,16 @@ async def create_campaign(
     subj = principal_subject(principal)
     owner_id = principal.id if isinstance(principal, User) else principal.owner_id
     await _require(
-        await authz.can_do(subj, "write", "subproject", str(subproject_id), org_id=str(project.organization_id))
+        await authz.can_do(
+            subj, "write", "subproject", str(subproject_id), org_id=str(project.organization_id)
+        )
     )
     try:
         c = await commands.create(
             CreateCampaignCommand(
                 name=body.name,
-                subproject_id=subproject_id,
+                parent_type="subproject",
+                parent_id=subproject_id,
                 org_id=project.organization_id,
                 requesting_user_id=owner_id,
             )
@@ -439,6 +549,9 @@ async def create_campaign(
     except NotAMember:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a member")
     return _campaign_resp(c)
+
+
+# --- Campaigns (individual) ---
 
 
 @router.get("/campaigns/{campaign_id}", response_model=CampaignResponse)

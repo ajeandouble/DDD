@@ -46,8 +46,8 @@ class CampaignQueryHandler:
     def __init__(self, repo: CampaignRepository) -> None:
         self._repo = repo
 
-    async def list_by_subproject(self, subproject_id: UUID) -> list[Campaign]:
-        return await self._repo.find_by_subproject(subproject_id)
+    async def list_by_parent(self, parent_id: UUID) -> list[Campaign]:
+        return await self._repo.find_by_parent(parent_id)
 
     async def get_by_id(self, campaign_id: UUID) -> Campaign | None:
         return await self._repo.find_by_id(campaign_id)

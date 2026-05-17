@@ -30,8 +30,9 @@ async def _on_subproject_created(event: SubprojectCreated) -> None:
 
 
 async def _on_campaign_created(event: CampaignCreated) -> None:
+    parent_scope = "org" if event.parent_type == "organization" else event.parent_type
     await _authz().register_lineage(
-        "campaign", event.campaign_id, "subproject", event.subproject_id
+        "campaign", event.campaign_id, parent_scope, str(event.parent_id)
     )
 
 

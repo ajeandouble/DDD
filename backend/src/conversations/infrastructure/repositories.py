@@ -1,7 +1,8 @@
+import re
 from uuid import UUID
 
 from src.conversations.domain.models import Conversation, ConversationStats, ScopeType
-from src.conversations.domain.repositories import ConversationRepository
+from src.conversations.domain.repositories import ConversationFilter, ConversationRepository, PagedResult
 from src.shared.mongo_repository import MongoRepository
 
 
@@ -48,6 +49,38 @@ def _from_doc(doc: dict) -> Conversation:
     )
 
 
+_NUM_OPS = {"gt": "$gt", "gte": "$gte", "lt": "$lt", "lte": "$lte"}
+
+
+def _string_condition(op: str, value: str) -> dict | str:
+    if op == "eq":
+        return value
+    if op == "contains":
+        return {"$regex": re.escape(value), "$options": "i"}
+    if op == "regex":
+        return {"$regex": value}
+    return value
+
+
+def _build_filter_clause(f: ConversationFilter) -> dict | None:
+    if f.field in ("title", "content"):
+        return {f.field: _string_condition(f.op, f.value)}
+    if f.field == "meta":
+        if not f.meta_key:
+            return None
+        return {"metadata": {"$elemMatch": {"key": f.meta_key, "value": _string_condition(f.op, f.value)}}}
+    if f.field in ("stats.word_count", "stats.duration_seconds"):
+        if not f.value.lstrip("-+").replace(".", "", 1).isdigit():
+            return None
+        num = float(f.value)
+        if f.op == "eq":
+            return {f.field: num}
+        mongo_op = _NUM_OPS.get(f.op)
+        if mongo_op:
+            return {f.field: {mongo_op: num}}
+    return None
+
+
 class MongoConversationRepository(MongoRepository, ConversationRepository):
     collection_name = "conversations"
 
@@ -83,6 +116,46 @@ class MongoConversationRepository(MongoRepository, ConversationRepository):
         doc = _to_doc(conversation)
         doc.pop("_id")
         await self._col.update_one({"_id": conversation.id}, {"$set": doc})
+
+    async def search(
+        self,
+        organization_id: UUID | None,
+        scope_id: UUID | None,
+        scope_type: ScopeType | None,
+        filters: list[ConversationFilter],
+        page: int,
+        page_size: int,
+        sort_by: str = "timestamp",
+        sort_dir: int = -1,
+    ) -> PagedResult:
+        _SORTABLE = {"timestamp", "title", "stats.word_count", "stats.duration_seconds"}
+        if sort_by not in _SORTABLE:
+            sort_by = "timestamp"
+
+        query: dict = {}
+        if organization_id is not None:
+            query["organization_id"] = organization_id
+        if scope_id is not None:
+            query["scope_id"] = scope_id
+        elif organization_id is not None:
+            query["scope_id"] = None
+        if scope_type is not None:
+            query["scope_type"] = scope_type
+
+        and_clauses = [c for f in filters if (c := _build_filter_clause(f))]
+        if and_clauses:
+            query["$and"] = and_clauses
+
+        skip = (page - 1) * page_size
+        total = await self._col.count_documents(query)
+        docs = (
+            await self._col.find(query)
+            .sort(sort_by, sort_dir)
+            .skip(skip)
+            .limit(page_size)
+            .to_list(length=page_size)
+        )
+        return PagedResult(items=[_from_doc(d) for d in docs], total=total, page=page, page_size=page_size)
 
     async def delete(self, conversation_id: UUID) -> None:
         await self._col.delete_one({"_id": conversation_id})

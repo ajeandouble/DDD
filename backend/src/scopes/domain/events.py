@@ -23,4 +23,6 @@ class SubprojectCreated:
 @dataclass(frozen=True)
 class CampaignCreated:
     campaign_id: UUID
-    subproject_id: UUID
+    parent_type: str
+    parent_id: UUID
+    organization_id: UUID
