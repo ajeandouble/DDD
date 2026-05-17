@@ -324,10 +324,34 @@ export const getImportJobs = (
 
 export const uploadAudio = (
   conversationId: string,
+  organizationId: string,
+  scopeId: string,
+  scopeType: string,
   file: File
 ): Promise<{ id: string; status: string; storage_key: string | null }> => {
   const form = new FormData();
   form.append("conversation_id", conversationId);
+  form.append("organization_id", organizationId);
+  form.append("scope_id", scopeId);
+  form.append("scope_type", scopeType);
   form.append("file", file);
   return api.post("imports/", { body: form, headers: authHeaders() }).json();
 };
+
+// --- Billing ---
+
+import type { SubscriptionResponse, UsageRecordResponse } from "../dto/billing";
+
+export const getSubscription = (orgId: string): Promise<SubscriptionResponse> =>
+  api.get(`billing/organizations/${orgId}/subscription`, { headers: authHeaders() }).json();
+
+export const upgradeSubscription = (orgId: string, tier: string): Promise<SubscriptionResponse> =>
+  api
+    .post(`billing/organizations/${orgId}/subscription/upgrade`, {
+      json: { tier },
+      headers: authHeaders(),
+    })
+    .json();
+
+export const getUsage = (orgId: string): Promise<UsageRecordResponse[]> =>
+  api.get(`billing/organizations/${orgId}/usage`, { headers: authHeaders() }).json();

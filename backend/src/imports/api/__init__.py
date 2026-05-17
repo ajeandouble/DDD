@@ -5,14 +5,18 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
+from src.billing.application.quota_service import QuotaExceeded
 from src.imports.application import store_file
 from src.imports.domain.events import FileIngested
 from src.imports.domain.models import ImportJob
 from src.imports.infrastructure.repositories import MongoImportJobRepository
 from src.shared.database import get_db
+from src.iam.application.authorization_service import AuthorizationService
 from src.iam.domain.models import User
-from src.shared.deps import get_current_user
+from src.shared.deps import get_authz, get_current_user, get_quota_service
 from src.shared.events import publish
+
+_WRITE_ROLES = {"editor", "supervisor", "admin"}
 
 router = APIRouter(prefix="/imports", tags=["imports"])
 
@@ -48,10 +52,28 @@ def _to_response(job: ImportJob) -> ImportJobResponse:
 @router.post("/", response_model=ImportJobResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file(
     conversation_id: UUID = Form(...),
+    organization_id: UUID = Form(...),
+    scope_id: UUID = Form(...),
+    scope_type: str = Form(...),
     file: UploadFile = File(...),
     repo: MongoImportJobRepository = Depends(_repo),
     user: User = Depends(get_current_user),
+    quota: object = Depends(get_quota_service),
+    authz: AuthorizationService = Depends(get_authz),
 ):
+    role = await authz.effective_role(
+        f"user:{user.id}", scope_type, str(scope_id), org_id=str(organization_id)
+    )
+    if role not in _WRITE_ROLES and not authz.is_superadmin(f"user:{user.id}"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Editor or higher required"
+        )
+
+    try:
+        await quota.check_analysis_quota(organization_id)
+    except QuotaExceeded as exc:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc))
+
     job = ImportJob.create(
         conversation_id=conversation_id,
         filename=file.filename or "upload",

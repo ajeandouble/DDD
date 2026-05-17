@@ -60,3 +60,10 @@ def get_authz():
 
     db = get_db()
     return AuthorizationService(get_enforcer(), MongoGroupRepository(db), db)
+
+
+def get_quota_service():
+    from src.billing.application.quota_service import QuotaService
+    from src.billing.infrastructure.repositories import MongoSubscriptionRepository
+
+    return QuotaService(MongoSubscriptionRepository(get_db()))

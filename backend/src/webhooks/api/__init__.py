@@ -6,7 +6,8 @@ from pydantic import BaseModel
 from src.iam.application.authorization_service import AuthorizationService
 from src.iam.domain.models import User
 from src.shared.database import get_db
-from src.shared.deps import get_authz, get_current_user
+from src.billing.application.quota_service import WebhookAccessDenied
+from src.shared.deps import get_authz, get_current_user, get_quota_service
 from src.webhooks.application import run_transformer
 from src.webhooks.domain import WebhookEndpoint
 from src.webhooks.infrastructure.repositories import (
@@ -107,8 +108,13 @@ async def list_endpoints(
     repo: MongoWebhookEndpointRepository = Depends(_ep_repo),
     user: User = Depends(get_current_user),
     authz: AuthorizationService = Depends(get_authz),
+    quota=Depends(get_quota_service),
 ):
     await _require_admin(org_id, user, authz)
+    try:
+        await quota.check_webhook_access(org_id)
+    except WebhookAccessDenied:
+        return []
     return [_ep_resp(ep) for ep in await repo.find_by_org(org_id)]
 
 
@@ -119,8 +125,13 @@ async def create_endpoint(
     repo: MongoWebhookEndpointRepository = Depends(_ep_repo),
     user: User = Depends(get_current_user),
     authz: AuthorizationService = Depends(get_authz),
+    quota=Depends(get_quota_service),
 ):
     await _require_admin(org_id, user, authz)
+    try:
+        await quota.check_webhook_access(org_id)
+    except WebhookAccessDenied as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     for et in body.event_types:
         if et not in SUPPORTED_EVENTS:
             raise HTTPException(400, f"Unknown event type: {et}")

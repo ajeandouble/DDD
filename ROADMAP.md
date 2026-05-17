@@ -45,14 +45,24 @@
 - Card layout: fixed date+time column on left, vertical divider, metadata badges inline
 - Backoff polling for pending transcripts: 1s → 5s → 10s×10 → 20s×20 → 5min; stops when transcript arrives
 
+### Phase 3 — Billing & Subscriptions
+- `Subscription` aggregate on `org_id`: `tier`, `tokens_used`, `period_start`, `owner_id`; `tokens_remaining` computed property
+- `UsageRecord` aggregate: one per transcription job — `org_id`, `conversation_id`, `duration_seconds`, `tokens_consumed`
+- Token heuristic: `100 + int(duration_seconds)` per job
+- Plans: `starter` (10k tokens, no webhooks), `pro` (100k, webhooks), `enterprise` (unlimited, webhooks)
+- `OrganizationCreated` → Billing event handler seeds a `starter` subscription automatically
+- `ConversationTranscribed` → Billing event handler records usage and deducts tokens
+- `QuotaService` (CQRS read side): `check_analysis_quota` raises `QuotaExceeded` (→ HTTP 402 on upload); `check_webhook_access` raises `WebhookAccessDenied` (→ HTTP 403 on endpoint create)
+- `GET /webhooks/endpoints` returns `[]` for starter orgs (no 403)
+- Upload (`POST /imports/`) now requires `scope_id` + `scope_type`; enforces editor+ role via Casbin before quota check
+- API: `GET /billing/organizations/{id}/subscription`, `POST .../upgrade`, `GET .../usage`
+- Frontend: `/orgs/:orgId/billing` — plan cards with token progress bar, fake payment modal (pre-filled card), usage history table
+- Frontend: "Upload audio" / "New conversation" buttons hidden for viewers (`canWrite` check via `myRoles.campaigns[scopeId]`)
+- Frontend: "New endpoint" button on WebhooksPage hidden for non-admins; starter orgs see upgrade CTA instead of endpoint list
+
 ---
 
 ## Planned
-
-### Phase 3 — Billing
-- `UsageRecord` aggregate, `InvoiceGenerated` event
-- Triggered by `TranscriptReady` (usage unit = duration_seconds)
-- Invoice generation endpoint, usage dashboard
 
 ### Phase 9 — Tag management UI
 - Tag CRUD per org, assign/remove tags on conversations

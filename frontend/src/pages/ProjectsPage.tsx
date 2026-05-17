@@ -25,7 +25,7 @@ import {
   createCampaignUnderOrg,
 } from "../lib/api";
 import { MembersDrawer } from "../components/MembersDrawer";
-import { useCanManageMembers } from "../hooks/useMyRoles";
+import { useCanManageMembers, useCanAdmin, useMyRoles } from "../hooks/useMyRoles";
 
 export function ProjectsPage() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -37,6 +37,9 @@ export function ProjectsPage() {
     useDisclosure(false);
   const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
   const canManageMembers = useCanManageMembers(orgId, "org", orgId);
+  const canAdminOrg = useCanAdmin(orgId, "org", orgId);
+  const { data: myRoles } = useMyRoles(orgId);
+  const isOrgMember = myRoles != null;
   const [projectName, setProjectName] = useState("");
   const [campaignName, setCampaignName] = useState("");
 
@@ -156,7 +159,12 @@ export function ProjectsPage() {
         <Group justify="space-between">
           <Title order={2}>{org?.name}</Title>
           <Group gap={6}>
-            {canManageMembers && (
+            {isOrgMember && (
+              <Button size="xs" variant="light" component={Link} to={`/orgs/${orgId}/billing`}>
+                Billing
+              </Button>
+            )}
+            {canAdminOrg && (
               <Button size="xs" variant="light" component={Link} to={`/orgs/${orgId}/webhooks`}>
                 Webhooks
               </Button>

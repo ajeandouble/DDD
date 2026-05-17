@@ -44,6 +44,9 @@ export function getEffectiveRole(
 export const canManageMembers = (role: Role | null): boolean =>
   role != null && ROLE_RANK[role] >= ROLE_RANK["supervisor"];
 
+export const canAdmin = (role: Role | null): boolean =>
+  role != null && ROLE_RANK[role] >= ROLE_RANK["admin"];
+
 export const canWrite = (role: Role | null): boolean =>
   role != null && ROLE_RANK[role] >= ROLE_RANK["editor"];
 

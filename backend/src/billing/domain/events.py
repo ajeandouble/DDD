@@ -1,0 +1,22 @@
+from dataclasses import dataclass
+from uuid import UUID
+
+
+@dataclass(frozen=True)
+class SubscriptionCreated:
+    org_id: UUID
+    tier: str
+
+
+@dataclass(frozen=True)
+class SubscriptionUpgraded:
+    org_id: UUID
+    old_tier: str
+    new_tier: str
+
+
+@dataclass(frozen=True)
+class UsageRecorded:
+    org_id: UUID
+    conversation_id: UUID
+    tokens_consumed: int

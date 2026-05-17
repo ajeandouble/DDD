@@ -27,8 +27,11 @@ import {
   updateWebhookEndpoint,
   listDeliveries,
   testTransformer,
+  getSubscription,
+  upgradeSubscription,
 } from "../lib/api";
 import type { WebhookEndpoint, Delivery } from "../dto/webhooks";
+import { useMyRoles } from "../hooks/useMyRoles";
 
 const DEFAULT_SAMPLE_PAYLOAD = JSON.stringify(
   {
@@ -84,10 +87,24 @@ export function WebhooksPage() {
   const qc = useQueryClient();
   const [createOpen, { open: openCreate, close: closeCreate }] = useDisclosure(false);
 
-  const { data: endpoints, isLoading } = useQuery({
+  const { data: subscription, isLoading: subLoading } = useQuery({
+    queryKey: ["subscription", orgId],
+    queryFn: () => getSubscription(orgId!),
+    retry: false,
+  });
+
+  const { data: myRoles } = useMyRoles(orgId);
+  const isAdmin = myRoles?.org === "admin";
+
+  const { data: endpoints, isLoading: epLoading } = useQuery({
     queryKey: ["webhooks", orgId],
     queryFn: () => listWebhookEndpoints(orgId!),
     retry: false,
+  });
+
+  const upgradeMutation = useMutation({
+    mutationFn: () => upgradeSubscription(orgId!, "pro"),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["subscription", orgId] }),
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["webhooks", orgId] });
@@ -97,15 +114,51 @@ export function WebhooksPage() {
     onSuccess: invalidate,
   });
 
-  if (isLoading) return <Loader size="sm" />;
+  if (subLoading || epLoading) return <Loader size="sm" />;
+
+  if (subscription?.tier === "starter") {
+    return (
+      <Stack gap="lg" align="center" mt="xl">
+        <Title order={3}>Webhooks</Title>
+        <Text c="dimmed" ta="center" maw={400}>
+          Webhook endpoints are available on the <strong>Pro</strong> and{" "}
+          <strong>Enterprise</strong> plans. Upgrade to start sending real-time notifications.
+        </Text>
+        <Text size="sm" c="dimmed">
+          Current plan: <strong>Starter</strong> &mdash; {subscription.tokens_remaining ?? "∞"} of{" "}
+          {subscription.tokens_remaining != null
+            ? subscription.tokens_remaining + subscription.tokens_used
+            : "∞"}{" "}
+          tokens remaining this period
+        </Text>
+        <Button
+          onClick={() => upgradeMutation.mutate()}
+          loading={upgradeMutation.isPending}
+          size="sm"
+        >
+          Upgrade to Pro
+        </Button>
+        {upgradeMutation.isError && <Alert color="red">{String(upgradeMutation.error)}</Alert>}
+      </Stack>
+    );
+  }
 
   return (
     <Stack gap="lg">
       <Group justify="space-between">
         <Title order={3}>Webhooks</Title>
-        <Button size="xs" onClick={openCreate}>
-          New endpoint
-        </Button>
+        <Group gap="xs">
+          {subscription && (
+            <Text size="xs" c="dimmed">
+              {subscription.tier} plan
+            </Text>
+          )}
+          {isAdmin && (
+            <Button size="xs" onClick={openCreate}>
+              New endpoint
+            </Button>
+          )}
+        </Group>
       </Group>
 
       {endpoints?.length === 0 && (
@@ -124,12 +177,14 @@ export function WebhooksPage() {
         />
       ))}
 
-      <CreateModal
-        orgId={orgId!}
-        opened={createOpen}
-        onClose={closeCreate}
-        onCreated={invalidate}
-      />
+      {isAdmin && (
+        <CreateModal
+          orgId={orgId!}
+          opened={createOpen}
+          onClose={closeCreate}
+          onCreated={invalidate}
+        />
+      )}
     </Stack>
   );
 }

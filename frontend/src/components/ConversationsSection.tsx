@@ -35,6 +35,8 @@ import {
 } from "../lib/api";
 import type { ConvFilter, FilterField, FilterOp } from "../lib/api";
 import type { ConversationResponse } from "../dto/conversations";
+import { useMyRoles } from "../hooks/useMyRoles";
+import { canWrite } from "../dto/permissions";
 
 type MetaRow = { key: string; value: string };
 
@@ -292,6 +294,11 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
 
+  const { data: myRoles } = useMyRoles(organizationId);
+  const scopeRole =
+    scopeType === "campaign" ? (myRoles?.campaigns?.[scopeId] ?? null) : (myRoles?.org ?? null);
+  const canWriteScope = canWrite(scopeRole);
+
   // Search / pagination / sort state
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
@@ -388,7 +395,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
         scope_id: scopeId,
         scope_type: "campaign",
       });
-      await uploadAudio(conv.id, audioFile);
+      await uploadAudio(conv.id, organizationId, scopeId, scopeType ?? "campaign", audioFile);
     },
     onSuccess: () => {
       invalidate();
@@ -644,12 +651,16 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
             <ActionIcon size="sm" variant="subtle" onClick={toggleFilters} title="Search / filter">
               <IconSearch size={14} />
             </ActionIcon>
-            <Button size="xs" variant="light" color="teal" onClick={openUpload}>
-              Upload audio
-            </Button>
-            <Button size="xs" variant="light" onClick={openCreate}>
-              New
-            </Button>
+            {canWriteScope && (
+              <Button size="xs" variant="light" color="teal" onClick={openUpload}>
+                Upload audio
+              </Button>
+            )}
+            {canWriteScope && (
+              <Button size="xs" variant="light" onClick={openCreate}>
+                New
+              </Button>
+            )}
           </Group>
         </Group>
 
