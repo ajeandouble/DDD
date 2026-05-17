@@ -54,6 +54,9 @@ class Subscription:
     def consume_tokens(self, amount: int) -> None:
         self.tokens_used += amount
 
+    def mark_quota_exhausted(self) -> None:
+        self.status = "quota_exceeded"
+
     def upgrade(self, new_tier: str) -> None:
         if new_tier not in PLAN_LIMITS:
             raise ValueError(f"Unknown tier: {new_tier}")

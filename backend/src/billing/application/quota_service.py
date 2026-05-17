@@ -1,23 +1,21 @@
 from uuid import UUID
 
-from src.billing.domain.models import PLAN_LIMITS
 from src.billing.domain.repositories import SubscriptionRepository
-from src.shared.exceptions import QuotaExceeded, WebhookAccessDenied
+from src.shared.exceptions import WebhookAccessDenied
 
-__all__ = ["QuotaExceeded", "WebhookAccessDenied", "QuotaService"]
+__all__ = ["WebhookAccessDenied", "QuotaService"]
 
 
 class QuotaService:
     def __init__(self, sub_repo: SubscriptionRepository) -> None:
         self._sub_repo = sub_repo
 
-    async def check_analysis_quota(self, org_id: UUID) -> None:
+    async def is_quota_ok(self, org_id: UUID) -> bool:
+        """Returns False only when billing has already marked the subscription quota_exceeded."""
         sub = await self._sub_repo.find_by_org(org_id)
         if sub is None or sub.tier == "enterprise":
-            return
-        limit = PLAN_LIMITS[sub.tier]["tokens"]
-        if limit is not None and sub.tokens_used >= limit:
-            raise QuotaExceeded(f"Token quota exhausted (used {sub.tokens_used}/{limit})")
+            return True
+        return sub.status != "quota_exceeded"
 
     async def check_webhook_access(self, org_id: UUID) -> None:
         sub = await self._sub_repo.find_by_org(org_id)

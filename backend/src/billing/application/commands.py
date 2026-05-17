@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from src.billing.domain.events import SubscriptionCreated, SubscriptionUpgraded, UsageRecorded
+from src.billing.domain.events import QuotaExhausted, SubscriptionCreated, SubscriptionUpgraded, UsageRecorded
 from src.billing.domain.models import Subscription, UsageRecord
 from src.billing.domain.repositories import SubscriptionRepository, UsageRepository
 from src.shared.events import publish
@@ -45,7 +45,12 @@ async def record_usage(
     sub = await sub_repo.find_by_org(org_id)
     if sub is not None and sub.tier != "enterprise":
         sub.consume_tokens(record.tokens_consumed)
-        await sub_repo.update(sub)
+        if sub.tokens_remaining == 0:
+            sub.mark_quota_exhausted()
+            await sub_repo.update(sub)
+            await publish(QuotaExhausted(org_id=org_id, tier=sub.tier, tokens_used=sub.tokens_used))
+        else:
+            await sub_repo.update(sub)
     await publish(
         UsageRecorded(
             org_id=org_id,

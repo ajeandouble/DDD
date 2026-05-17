@@ -5,7 +5,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
-from src.shared.exceptions import QuotaExceeded
 from src.imports.application import store_file
 from src.imports.domain.events import FileIngested
 from src.imports.domain.models import ImportJob
@@ -69,10 +68,11 @@ async def upload_file(
             status_code=status.HTTP_403_FORBIDDEN, detail="Editor or higher required"
         )
 
-    try:
-        await quota.check_analysis_quota(organization_id)
-    except QuotaExceeded as exc:
-        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc))
+    if not await quota.is_quota_ok(organization_id):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Token quota exhausted — upgrade your plan to continue uploading",
+        )
 
     job = ImportJob.create(
         conversation_id=conversation_id,

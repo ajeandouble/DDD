@@ -20,3 +20,10 @@ class UsageRecorded:
     org_id: UUID
     conversation_id: UUID
     tokens_consumed: int
+
+
+@dataclass(frozen=True)
+class QuotaExhausted:
+    org_id: UUID
+    tier: str
+    tokens_used: int

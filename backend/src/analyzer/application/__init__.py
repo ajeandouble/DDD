@@ -3,7 +3,7 @@ import os
 from typing import Callable
 from uuid import UUID
 
-from src.analyzer.domain import AnalysisJob, Transcript, TranscriptSegment, TranscriptWord
+from src.analyzer.domain import AnalysisJob, JobStatus, Transcript, TranscriptSegment, TranscriptWord
 from src.analyzer.domain.events import TranscriptFailed, TranscriptReady
 from src.analyzer.domain.repositories import AnalysisJobRepository
 from src.shared.events import publish
@@ -56,6 +56,8 @@ async def _process_one(job_id: UUID, repo: AnalysisJobRepository) -> None:
     job = await repo.find_by_id(job_id)
     if job is None:
         return
+    if not job.can_retry and job.status == JobStatus.FAILED:
+        return  # exhausted — dropped from queue
 
     job.start()
     await repo.update(job)
@@ -105,14 +107,10 @@ async def _process_one(job_id: UUID, repo: AnalysisJobRepository) -> None:
             TranscriptFailed(job_id=job.id, conversation_id=job.conversation_id, reason=reason)
         )
         if job.can_retry:
-            job_copy = AnalysisJob.create(
-                import_job_id=job.import_job_id,
-                conversation_id=job.conversation_id,
-                storage_key=job.storage_key,
-            )
-            job_copy.attempts = job.attempts
-            await repo.save(job_copy)
-            await _queue.put(job_copy.id)
+            delay = 2 ** job.attempts  # 2s, 4s, 8s for attempts 1, 2, 3
+            print(f"[analyzer] retry in {delay}s for job {job.id} (attempt {job.attempts})")
+            await asyncio.sleep(delay)
+            await _queue.put(job.id)
 
 
 async def worker(repo_factory: Callable[[], AnalysisJobRepository]) -> None:
