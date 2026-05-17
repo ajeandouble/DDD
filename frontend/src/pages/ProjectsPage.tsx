@@ -8,7 +8,6 @@ import {
   Modal,
   TextInput,
   SimpleGrid,
-  Card,
   Text,
   Stack,
   Loader,
@@ -16,6 +15,7 @@ import {
   Breadcrumbs,
   Anchor,
 } from "@mantine/core";
+import { ScopeCard } from "../components/ScopeCard";
 import { useDisclosure } from "@mantine/hooks";
 import {
   getOrganization,
@@ -202,17 +202,12 @@ export function ProjectsPage() {
         )}
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
           {campaigns?.map((c) => (
-            <Card
+            <ScopeCard
               key={c.id}
-              shadow="sm"
-              padding="md"
-              radius="md"
-              withBorder
-              style={{ cursor: "pointer" }}
+              name={c.name}
+              color={c.color}
               onClick={() => navigate(`/campaigns/${c.id}`)}
-            >
-              <Text fw={500}>{c.name}</Text>
-            </Card>
+            />
           ))}
         </SimpleGrid>
 
@@ -234,17 +229,12 @@ export function ProjectsPage() {
 
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
           {projects?.map((project) => (
-            <Card
+            <ScopeCard
               key={project.id}
-              shadow="sm"
-              padding="md"
-              radius="md"
-              withBorder
-              style={{ cursor: "pointer" }}
+              name={project.name}
+              color={project.color}
               onClick={() => navigate(`/orgs/${orgId}/projects/${project.id}`)}
-            >
-              <Text fw={500}>{project.name}</Text>
-            </Card>
+            />
           ))}
         </SimpleGrid>
       </Stack>

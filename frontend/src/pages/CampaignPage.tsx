@@ -1,14 +1,18 @@
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Title, Stack, Breadcrumbs, Anchor, Text, Group, Button } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { getCampaign, getOrganization, getProject, getSubproject } from "../lib/api";
+import { getCampaign, getOrganization, getProject, getSubproject, updateCampaignSettings } from "../lib/api";
 import { ConversationsSection } from "../components/ConversationsSection";
 import { MembersDrawer } from "../components/MembersDrawer";
-import { useCanManageMembers } from "../hooks/useMyRoles";
+import { ScopeSettingsModal } from "../components/ScopeSettingsModal";
+import { useCanManageMembers, useMyRoles } from "../hooks/useMyRoles";
+import { getEffectiveRole, canManageMembers } from "../dto/permissions";
 
 export function CampaignPage() {
   const { campaignId } = useParams<{ campaignId: string }>();
+  const queryClient = useQueryClient();
+  const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
 
   const { data: campaign } = useQuery({
     queryKey: ["campaign", campaignId],
@@ -43,7 +47,19 @@ export function CampaignPage() {
   });
 
   const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
-  const canManageMembers = useCanManageMembers(orgId, "campaign", campaignId);
+  const canManageMembersOnScope = useCanManageMembers(orgId, "campaign", campaignId);
+
+  const { data: myRoles } = useMyRoles(orgId);
+  const scopeRole = myRoles ? getEffectiveRole("campaign", campaignId!, myRoles) : null;
+  const canSettings = canManageMembers(scopeRole);
+
+  const settingsMutation = useMutation({
+    mutationFn: (color: string | null) => updateCampaignSettings(campaignId!, { color }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaign", campaignId] });
+      closeSettings();
+    },
+  });
 
   const breadcrumbItems = buildBreadcrumbs(
     orgId,
@@ -54,18 +70,48 @@ export function CampaignPage() {
     subprojectProject
   );
 
+  const color = campaign?.color;
+
   return (
     <Stack gap="lg">
       <Breadcrumbs>{breadcrumbItems}</Breadcrumbs>
 
-      <Group justify="space-between">
+      <Group
+        justify="space-between"
+        style={
+          color
+            ? {
+                borderLeft: `4px solid ${color}`,
+                paddingLeft: 12,
+                background: `${color}12`,
+                borderRadius: 4,
+              }
+            : undefined
+        }
+      >
         <Title order={2}>{campaign?.name}</Title>
-        {canManageMembers && (
-          <Button size="xs" variant="light" onClick={openMembers}>
-            Members
-          </Button>
-        )}
+        <Group gap={6}>
+          {canSettings && (
+            <Button size="xs" variant="light" onClick={openSettings}>
+              Settings
+            </Button>
+          )}
+          {canManageMembersOnScope && (
+            <Button size="xs" variant="light" onClick={openMembers}>
+              Members
+            </Button>
+          )}
+        </Group>
       </Group>
+
+      <ScopeSettingsModal
+        opened={settingsOpened}
+        onClose={closeSettings}
+        currentColor={campaign?.color}
+        onSave={(color) => settingsMutation.mutate(color)}
+        isPending={settingsMutation.isPending}
+        error={settingsMutation.error}
+      />
 
       {orgId && (
         <MembersDrawer

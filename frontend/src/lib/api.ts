@@ -86,7 +86,7 @@ export const createConversation = (data: {
 
 export const updateConversation = (
   id: string,
-  data: { title?: string; content?: string | unknown[] }
+  data: { title?: string; content?: string | unknown[]; tag_ids?: string[] }
 ): Promise<ConversationResponse> =>
   api.patch(`conversations/${id}`, { json: data, headers: authHeaders() }).json();
 
@@ -98,6 +98,28 @@ export const deleteConversation = (id: string): Promise<void> =>
 
 export const getMe = (): Promise<UserResponse> =>
   api.get("auth/me", { headers: authHeaders() }).json();
+
+// --- Tags ---
+
+export interface TagResponse {
+  id: string;
+  name: string;
+  org_id: string;
+  created_at: string;
+}
+
+export const listTags = (orgId: string): Promise<TagResponse[]> =>
+  api.get(`conversations/organizations/${orgId}/tags`, { headers: authHeaders() }).json();
+
+export const createTag = (orgId: string, name: string): Promise<TagResponse> =>
+  api
+    .post(`conversations/organizations/${orgId}/tags`, { json: { name }, headers: authHeaders() })
+    .json();
+
+export const deleteTag = (orgId: string, tagId: string): Promise<void> =>
+  api
+    .delete(`conversations/organizations/${orgId}/tags/${tagId}`, { headers: authHeaders() })
+    .then(() => undefined);
 
 // --- Scopes ---
 
@@ -134,6 +156,30 @@ export const createSubproject = (projectId: string, name: string): Promise<Subpr
 
 export const getCampaign = (campaignId: string): Promise<Campaign> =>
   api.get(`scopes/campaigns/${campaignId}`, { headers: authHeaders() }).json();
+
+export const updateProjectSettings = (
+  projectId: string,
+  body: { color: string | null }
+): Promise<Project> =>
+  api
+    .patch(`scopes/projects/${projectId}/settings`, { json: body, headers: authHeaders() })
+    .json();
+
+export const updateSubprojectSettings = (
+  subprojectId: string,
+  body: { color: string | null }
+): Promise<Subproject> =>
+  api
+    .patch(`scopes/subprojects/${subprojectId}/settings`, { json: body, headers: authHeaders() })
+    .json();
+
+export const updateCampaignSettings = (
+  campaignId: string,
+  body: { color: string | null }
+): Promise<Campaign> =>
+  api
+    .patch(`scopes/campaigns/${campaignId}/settings`, { json: body, headers: authHeaders() })
+    .json();
 
 export const getCampaignsByOrg = (orgId: string): Promise<Campaign[]> =>
   api.get(`scopes/organizations/${orgId}/campaigns/`, { headers: authHeaders() }).json();

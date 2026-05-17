@@ -8,7 +8,6 @@ import {
   Modal,
   TextInput,
   SimpleGrid,
-  Card,
   Text,
   Stack,
   Loader,
@@ -23,8 +22,11 @@ import {
   getSubproject,
   getCampaigns,
   createCampaign,
+  updateSubprojectSettings,
 } from "../lib/api";
 import { MembersDrawer } from "../components/MembersDrawer";
+import { ScopeCard } from "../components/ScopeCard";
+import { ScopeSettingsModal } from "../components/ScopeSettingsModal";
 import { useCanManageMembers } from "../hooks/useMyRoles";
 
 export function CampaignsPage() {
@@ -37,7 +39,8 @@ export function CampaignsPage() {
   const queryClient = useQueryClient();
   const [opened, { open, close }] = useDisclosure(false);
   const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
-  const canManageMembers = useCanManageMembers(orgId, "subproject", subprojectId);
+  const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
+  const canManageMembersOnScope = useCanManageMembers(orgId, "subproject", subprojectId);
   const [name, setName] = useState("");
 
   const { data: org } = useQuery({
@@ -73,6 +76,16 @@ export function CampaignsPage() {
     },
   });
 
+  const settingsMutation = useMutation({
+    mutationFn: (color: string | null) => updateSubprojectSettings(subprojectId!, { color }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subproject", subprojectId] });
+      closeSettings();
+    },
+  });
+
+  const color = subproject?.color;
+
   return (
     <>
       <Modal opened={opened} onClose={close} title="New campaign" centered>
@@ -101,6 +114,15 @@ export function CampaignsPage() {
         </Stack>
       </Modal>
 
+      <ScopeSettingsModal
+        opened={settingsOpened}
+        onClose={closeSettings}
+        currentColor={subproject?.color}
+        onSave={(color) => settingsMutation.mutate(color)}
+        isPending={settingsMutation.isPending}
+        error={settingsMutation.error}
+      />
+
       <Stack gap="lg">
         <Breadcrumbs>
           <Anchor component={Link} to="/orgs" size="sm">
@@ -115,13 +137,32 @@ export function CampaignsPage() {
           <Text size="sm">{subproject?.name ?? subprojectId}</Text>
         </Breadcrumbs>
 
-        <Group justify="space-between">
+        <Group
+          justify="space-between"
+          style={
+            color
+              ? {
+                  borderLeft: `4px solid ${color}`,
+                  paddingLeft: 12,
+                  background: `${color}12`,
+                  borderRadius: 4,
+                }
+              : undefined
+          }
+        >
           <Title order={2}>{subproject?.name}</Title>
-          {canManageMembers && (
-            <Button size="xs" variant="light" onClick={openMembers}>
-              Members
-            </Button>
-          )}
+          <Group gap={6}>
+            {canManageMembersOnScope && (
+              <Button size="xs" variant="light" onClick={openSettings}>
+                Settings
+              </Button>
+            )}
+            {canManageMembersOnScope && (
+              <Button size="xs" variant="light" onClick={openMembers}>
+                Members
+              </Button>
+            )}
+          </Group>
         </Group>
 
         <MembersDrawer
@@ -150,17 +191,12 @@ export function CampaignsPage() {
 
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
           {data?.map((campaign) => (
-            <Card
+            <ScopeCard
               key={campaign.id}
-              shadow="sm"
-              padding="md"
-              radius="md"
-              withBorder
-              style={{ cursor: "pointer" }}
+              name={campaign.name}
+              color={campaign.color}
               onClick={() => navigate(`/campaigns/${campaign.id}`)}
-            >
-              <Text fw={500}>{campaign.name}</Text>
-            </Card>
+            />
           ))}
         </SimpleGrid>
       </Stack>

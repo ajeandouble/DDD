@@ -8,7 +8,6 @@ import {
   Modal,
   TextInput,
   SimpleGrid,
-  Card,
   Text,
   Stack,
   Loader,
@@ -24,8 +23,11 @@ import {
   createSubproject,
   getCampaignsByProject,
   createCampaignUnderProject,
+  updateProjectSettings,
 } from "../lib/api";
 import { MembersDrawer } from "../components/MembersDrawer";
+import { ScopeCard } from "../components/ScopeCard";
+import { ScopeSettingsModal } from "../components/ScopeSettingsModal";
 import { useCanManageMembers } from "../hooks/useMyRoles";
 
 export function SubprojectsPage() {
@@ -37,7 +39,8 @@ export function SubprojectsPage() {
   const [campaignModalOpened, { open: openCampaignModal, close: closeCampaignModal }] =
     useDisclosure(false);
   const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
-  const canManageMembers = useCanManageMembers(orgId, "project", projectId);
+  const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
+  const canManageMembersOnScope = useCanManageMembers(orgId, "project", projectId);
   const [subprojectName, setSubprojectName] = useState("");
   const [campaignName, setCampaignName] = useState("");
 
@@ -86,6 +89,16 @@ export function SubprojectsPage() {
       setCampaignName("");
     },
   });
+
+  const settingsMutation = useMutation({
+    mutationFn: (color: string | null) => updateProjectSettings(projectId!, { color }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      closeSettings();
+    },
+  });
+
+  const color = project?.color;
 
   return (
     <>
@@ -157,6 +170,15 @@ export function SubprojectsPage() {
         </Stack>
       </Modal>
 
+      <ScopeSettingsModal
+        opened={settingsOpened}
+        onClose={closeSettings}
+        currentColor={project?.color}
+        onSave={(color) => settingsMutation.mutate(color)}
+        isPending={settingsMutation.isPending}
+        error={settingsMutation.error}
+      />
+
       <Stack gap="lg">
         <Breadcrumbs>
           <Anchor component={Link} to="/orgs" size="sm">
@@ -168,13 +190,32 @@ export function SubprojectsPage() {
           <Text size="sm">{project?.name ?? projectId}</Text>
         </Breadcrumbs>
 
-        <Group justify="space-between">
+        <Group
+          justify="space-between"
+          style={
+            color
+              ? {
+                  borderLeft: `4px solid ${color}`,
+                  paddingLeft: 12,
+                  background: `${color}12`,
+                  borderRadius: 4,
+                }
+              : undefined
+          }
+        >
           <Title order={2}>{project?.name}</Title>
-          {canManageMembers && (
-            <Button size="xs" variant="light" onClick={openMembers}>
-              Members
-            </Button>
-          )}
+          <Group gap={6}>
+            {canManageMembersOnScope && (
+              <Button size="xs" variant="light" onClick={openSettings}>
+                Settings
+              </Button>
+            )}
+            {canManageMembersOnScope && (
+              <Button size="xs" variant="light" onClick={openMembers}>
+                Members
+              </Button>
+            )}
+          </Group>
         </Group>
 
         <MembersDrawer
@@ -202,17 +243,12 @@ export function SubprojectsPage() {
         )}
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
           {campaigns?.map((c) => (
-            <Card
+            <ScopeCard
               key={c.id}
-              shadow="sm"
-              padding="md"
-              radius="md"
-              withBorder
-              style={{ cursor: "pointer" }}
+              name={c.name}
+              color={c.color}
               onClick={() => navigate(`/campaigns/${c.id}`)}
-            >
-              <Text fw={500}>{c.name}</Text>
-            </Card>
+            />
           ))}
         </SimpleGrid>
 
@@ -234,17 +270,14 @@ export function SubprojectsPage() {
 
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
           {subprojects?.map((sp) => (
-            <Card
+            <ScopeCard
               key={sp.id}
-              shadow="sm"
-              padding="md"
-              radius="md"
-              withBorder
-              style={{ cursor: "pointer" }}
-              onClick={() => navigate(`/orgs/${orgId}/projects/${projectId}/subprojects/${sp.id}`)}
-            >
-              <Text fw={500}>{sp.name}</Text>
-            </Card>
+              name={sp.name}
+              color={sp.color}
+              onClick={() =>
+                navigate(`/orgs/${orgId}/projects/${projectId}/subprojects/${sp.id}`)
+              }
+            />
           ))}
         </SimpleGrid>
       </Stack>

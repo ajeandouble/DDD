@@ -15,6 +15,7 @@ export const ProjectSchema = z.object({
   name: z.string(),
   organization_id: z.string().uuid(),
   created_at: z.string(),
+  color: z.string().nullable().optional(),
 });
 
 export type Project = z.infer<typeof ProjectSchema>;
@@ -24,6 +25,7 @@ export const SubprojectSchema = z.object({
   name: z.string(),
   project_id: z.string().uuid(),
   created_at: z.string(),
+  color: z.string().nullable().optional(),
 });
 
 export type Subproject = z.infer<typeof SubprojectSchema>;
@@ -35,6 +37,7 @@ export const CampaignSchema = z.object({
   parent_id: z.string().uuid(),
   organization_id: z.string().uuid(),
   created_at: z.string(),
+  color: z.string().nullable().optional(),
 });
 
 export type Campaign = z.infer<typeof CampaignSchema>;
