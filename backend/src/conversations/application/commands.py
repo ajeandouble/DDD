@@ -1,17 +1,19 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 from uuid import UUID
 
-from src.conversations.domain.models import Conversation, ScopeType
+from src.conversations.domain.models import Conversation, ConversationType, ScopeType
 from src.conversations.domain.repositories import ConversationRepository
 
 
 @dataclass
 class CreateConversationCommand:
     title: str
-    content: str
+    content: str | list[dict]
+    type: ConversationType
     created_by: UUID
+    conversation_timestamp: datetime | None = None
     metadata: list[tuple[str, str]] = field(default_factory=list)
-    emit_webhook: bool = False
     organization_id: UUID | None = None
     scope_id: UUID | None = None
     scope_type: ScopeType | None = None
@@ -22,9 +24,8 @@ class CreateConversationCommand:
 class UpdateConversationCommand:
     id: UUID
     title: str | None = None
-    content: str | None = None
+    content: str | list[dict] | None = None
     metadata: list[tuple[str, str]] | None = None
-    emit_webhook: bool | None = None
 
 
 class ConversationNotFound(Exception):
@@ -39,9 +40,10 @@ class ConversationCommandHandler:
         c = Conversation.create(
             title=cmd.title,
             content=cmd.content,
+            type=cmd.type,
             created_by=cmd.created_by,
+            conversation_timestamp=cmd.conversation_timestamp,
             metadata=cmd.metadata,
-            emit_webhook=cmd.emit_webhook,
             organization_id=cmd.organization_id,
             scope_id=cmd.scope_id,
             scope_type=cmd.scope_type,
@@ -58,7 +60,6 @@ class ConversationCommandHandler:
             title=cmd.title,
             content=cmd.content,
             metadata=cmd.metadata,
-            emit_webhook=cmd.emit_webhook,
         )
         await self._repo.update(c)
         return c

@@ -4,6 +4,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 
 ScopeType = Literal["organization", "project", "subproject", "campaign"]
+ConversationType = Literal["review", "conversation"]
 
 
 @dataclass
@@ -16,12 +17,13 @@ class ConversationStats:
 @dataclass
 class Conversation:
     title: str
-    content: str
+    content: str | list[dict]
+    type: ConversationType
     created_by: UUID
     id: UUID = field(default_factory=uuid4)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    conversation_timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: list[tuple[str, str]] = field(default_factory=list)
-    emit_webhook: bool = False
     stats: ConversationStats = field(default_factory=ConversationStats)
     organization_id: UUID | None = None
     scope_id: UUID | None = None
@@ -32,21 +34,25 @@ class Conversation:
     def create(
         cls,
         title: str,
-        content: str,
+        content: str | list[dict],
+        type: ConversationType,
         created_by: UUID,
+        conversation_timestamp: datetime | None = None,
         metadata: list[tuple[str, str]] | None = None,
-        emit_webhook: bool = False,
         organization_id: UUID | None = None,
         scope_id: UUID | None = None,
         scope_type: ScopeType | None = None,
         tag_ids: list[UUID] | None = None,
     ) -> "Conversation":
+        now = datetime.now(timezone.utc)
         return cls(
             title=title,
             content=content,
+            type=type,
             created_by=created_by,
+            conversation_timestamp=conversation_timestamp or now,
+            created_at=now,
             metadata=metadata or [],
-            emit_webhook=emit_webhook,
             organization_id=organization_id,
             scope_id=scope_id,
             scope_type=scope_type,
@@ -56,9 +62,8 @@ class Conversation:
     def update(
         self,
         title: str | None = None,
-        content: str | None = None,
+        content: str | list[dict] | None = None,
         metadata: list[tuple[str, str]] | None = None,
-        emit_webhook: bool | None = None,
     ) -> None:
         if title is not None:
             self.title = title
@@ -66,8 +71,6 @@ class Conversation:
             self.content = content
         if metadata is not None:
             self.metadata = metadata
-        if emit_webhook is not None:
-            self.emit_webhook = emit_webhook
 
     def update_stats(self, stats: ConversationStats) -> None:
         self.stats = stats

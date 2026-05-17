@@ -70,8 +70,6 @@ export function LoginPage() {
             />
           </div>
 
-
-
           <button className={styles.button} type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? "Please wait…" : mode === "login" ? "Sign in" : "Register"}
           </button>

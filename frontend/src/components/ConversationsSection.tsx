@@ -83,7 +83,9 @@ function FilterRow({
         style={{ width: 140 }}
         data={FIELD_OPTIONS}
         value={filter.field}
-        onChange={(v) => onChange({ ...filter, field: v as FilterField, op: "eq", value: "", meta_key: "" })}
+        onChange={(v) =>
+          onChange({ ...filter, field: v as FilterField, op: "eq", value: "", meta_key: "" })
+        }
       />
       {filter.field === "meta" && (
         <TextInput
@@ -126,7 +128,8 @@ function FilterPanel({
   onApply: () => void;
   onClear: () => void;
 }) {
-  const add = () => onChange([...value, { field: "content", op: "contains", value: "", meta_key: "" }]);
+  const add = () =>
+    onChange([...value, { field: "content", op: "contains", value: "", meta_key: "" }]);
   const update = (i: number, f: ConvFilter) => onChange(value.map((r, idx) => (idx === i ? f : r)));
   const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
 
@@ -134,15 +137,24 @@ function FilterPanel({
     <Paper withBorder p="xs" radius="sm">
       <Stack gap={6}>
         {value.map((f, i) => (
-          <FilterRow key={i} filter={f} onChange={(nf) => update(i, nf)} onRemove={() => remove(i)} />
+          <FilterRow
+            key={i}
+            filter={f}
+            onChange={(nf) => update(i, nf)}
+            onRemove={() => remove(i)}
+          />
         ))}
         <Group justify="space-between">
           <Button size="xs" variant="subtle" leftSection={<IconPlus size={13} />} onClick={add}>
             Add filter
           </Button>
           <Group gap={6}>
-            <Button size="xs" variant="subtle" color="dimmed" onClick={onClear}>Clear</Button>
-            <Button size="xs" onClick={onApply} leftSection={<IconSearch size={13} />}>Search</Button>
+            <Button size="xs" variant="subtle" color="dimmed" onClick={onClear}>
+              Clear
+            </Button>
+            <Button size="xs" onClick={onApply} leftSection={<IconSearch size={13} />}>
+              Search
+            </Button>
           </Group>
         </Group>
       </Stack>
@@ -165,7 +177,9 @@ function MetadataEditor({
   return (
     <Stack gap={6}>
       <Group justify="space-between">
-        <Text size="sm" fw={500}>Metadata</Text>
+        <Text size="sm" fw={500}>
+          Metadata
+        </Text>
         <ActionIcon size="xs" variant="subtle" onClick={add}>
           <IconPlus size={14} />
         </ActionIcon>
@@ -192,7 +206,9 @@ function MetadataEditor({
         </Group>
       ))}
       {value.length === 0 && (
-        <Text size="xs" c="dimmed">No metadata — click + to add a key/value pair.</Text>
+        <Text size="xs" c="dimmed">
+          No metadata — click + to add a key/value pair.
+        </Text>
       )}
     </Stack>
   );
@@ -287,7 +303,10 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
 
   const toggleSort = (field: string) => {
     if (sortBy === field) setSortDir((d) => (d === -1 ? 1 : -1));
-    else { setSortBy(field); setSortDir(-1); }
+    else {
+      setSortBy(field);
+      setSortDir(-1);
+    }
     setPage(1);
   };
 
@@ -295,13 +314,21 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
   const [hasPending, setHasPending] = useState(false);
   const refetchInterval = useBackoffInterval(hasPending);
 
-  const scopeParams = scopeId && scopeType
-    ? { scope_id: scopeId, scope_type: scopeType }
-    : { organization_id: organizationId };
+  const scopeParams =
+    scopeId && scopeType
+      ? { scope_id: scopeId, scope_type: scopeType }
+      : { organization_id: organizationId };
 
   const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: ["conversations", ...queryKey, page, activeFilters, sortBy, sortDir],
-    queryFn: () => searchConversations(scopeParams, { filters: activeFilters, page, page_size: PAGE_SIZE, sort_by: sortBy, sort_dir: sortDir }),
+    queryFn: () =>
+      searchConversations(scopeParams, {
+        filters: activeFilters,
+        page,
+        page_size: PAGE_SIZE,
+        sort_by: sortBy,
+        sort_dir: sortDir,
+      }),
     retry: false,
     refetchInterval,
   });
@@ -309,7 +336,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
   useEffect(() => {
     if (!data) return;
     const pending = data.items.some(
-      (c) => c.type === "conversation" && Array.isArray(c.content) && c.content.length === 0,
+      (c) => c.type === "conversation" && Array.isArray(c.content) && c.content.length === 0
     );
     setHasPending(pending);
   }, [dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -353,7 +380,9 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
         title: uploadTitle || audioFile.name,
         content: [],
         type: "conversation",
-        conversation_timestamp: uploadConversationTs ? new Date(uploadConversationTs).toISOString() : undefined,
+        conversation_timestamp: uploadConversationTs
+          ? new Date(uploadConversationTs).toISOString()
+          : undefined,
         metadata: uploadMetadata.filter((m) => m.key.trim()),
         organization_id: organizationId,
         scope_id: scopeId,
@@ -412,7 +441,9 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
           />
           <Stack gap={6}>
             <Group justify="space-between" align="center">
-              <Text size="sm" fw={500}>Content</Text>
+              <Text size="sm" fw={500}>
+                Content
+              </Text>
               <SegmentedControl
                 size="xs"
                 value={contentMode}
@@ -435,14 +466,24 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
             )}
           </Stack>
           <Stack gap={4}>
-            <Text size="sm" fw={500}>Date &amp; time (UTC)</Text>
+            <Text size="sm" fw={500}>
+              Date &amp; time (UTC)
+            </Text>
             <input
               type="datetime-local"
               value={conversationTs}
               onChange={(e) => setConversationTs(e.currentTarget.value)}
-              style={{ width: "100%", padding: "6px 8px", borderRadius: 4, border: "1px solid #ced4da", fontSize: 14 }}
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                borderRadius: 4,
+                border: "1px solid #ced4da",
+                fontSize: 14,
+              }}
             />
-            <Text size="xs" c="dimmed">Leave blank to use current time</Text>
+            <Text size="xs" c="dimmed">
+              Leave blank to use current time
+            </Text>
           </Stack>
           <MetadataEditor value={metadata} onChange={setMetadata} />
           {createMutation.isError && (
@@ -462,13 +503,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
       </Modal>
 
       {/* Upload audio modal */}
-      <Modal
-        opened={uploadOpened}
-        onClose={closeUpload}
-        title="Upload audio"
-        centered
-        size="md"
-      >
+      <Modal opened={uploadOpened} onClose={closeUpload} title="Upload audio" centered size="md">
         <Stack>
           <TextInput
             label="Title"
@@ -499,14 +534,24 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
             </Group>
           </Stack>
           <Stack gap={4}>
-            <Text size="sm" fw={500}>Date &amp; time (UTC)</Text>
+            <Text size="sm" fw={500}>
+              Date &amp; time (UTC)
+            </Text>
             <input
               type="datetime-local"
               value={uploadConversationTs}
               onChange={(e) => setUploadConversationTs(e.currentTarget.value)}
-              style={{ width: "100%", padding: "6px 8px", borderRadius: 4, border: "1px solid #ced4da", fontSize: 14 }}
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                borderRadius: 4,
+                border: "1px solid #ced4da",
+                fontSize: 14,
+              }}
             />
-            <Text size="xs" c="dimmed">Leave blank to use current time</Text>
+            <Text size="xs" c="dimmed">
+              Leave blank to use current time
+            </Text>
           </Stack>
           <MetadataEditor value={uploadMetadata} onChange={setUploadMetadata} />
           {uploadMutation.isPending && <Progress animated value={100} size="xs" />}
@@ -570,22 +615,30 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
       <Stack gap="sm">
         <Group justify="space-between">
           <Group gap={6}>
-            <Text fw={600} size="sm" c="dimmed">CONVERSATIONS</Text>
-            {(["conversation_timestamp", "title", "stats.duration_seconds"] as const).map((field) => {
-              const labels: Record<string, string> = { conversation_timestamp: "Date", title: "Title", "stats.duration_seconds": "Duration" };
-              const active = sortBy === field;
-              return (
-                <Button
-                  key={field}
-                  size="xs"
-                  variant={active ? "light" : "subtle"}
-                  onClick={() => toggleSort(field)}
-                  rightSection={active ? (sortDir === -1 ? "↓" : "↑") : undefined}
-                >
-                  {labels[field]}
-                </Button>
-              );
-            })}
+            <Text fw={600} size="sm" c="dimmed">
+              CONVERSATIONS
+            </Text>
+            {(["conversation_timestamp", "title", "stats.duration_seconds"] as const).map(
+              (field) => {
+                const labels: Record<string, string> = {
+                  conversation_timestamp: "Date",
+                  title: "Title",
+                  "stats.duration_seconds": "Duration",
+                };
+                const active = sortBy === field;
+                return (
+                  <Button
+                    key={field}
+                    size="xs"
+                    variant={active ? "light" : "subtle"}
+                    onClick={() => toggleSort(field)}
+                    rightSection={active ? (sortDir === -1 ? "↓" : "↑") : undefined}
+                  >
+                    {labels[field]}
+                  </Button>
+                );
+              }
+            )}
           </Group>
           <Group gap={6}>
             <ActionIcon size="sm" variant="subtle" onClick={toggleFilters} title="Search / filter">
@@ -604,8 +657,15 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
           <FilterPanel
             value={draftFilters}
             onChange={setDraftFilters}
-            onApply={() => { setActiveFilters(draftFilters); setPage(1); }}
-            onClear={() => { setDraftFilters([]); setActiveFilters([]); setPage(1); }}
+            onApply={() => {
+              setActiveFilters(draftFilters);
+              setPage(1);
+            }}
+            onClear={() => {
+              setDraftFilters([]);
+              setActiveFilters([]);
+              setPage(1);
+            }}
           />
         </Collapse>
 
@@ -665,11 +725,16 @@ function ConversationCard({
   });
 
   const hasAudio = (importJobs?.length ?? 0) > 0;
-  const hasTranscript = conv.type === "conversation" && Array.isArray(conv.content) && conv.content.length > 0;
+  const hasTranscript =
+    conv.type === "conversation" && Array.isArray(conv.content) && conv.content.length > 0;
   const isTranscribing = hasAudio && !hasTranscript;
 
   const ts = new Date(conv.conversation_timestamp);
-  const dateStr = ts.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const dateStr = ts.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
   const timeStr = ts.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
   return (
@@ -677,8 +742,12 @@ function ConversationCard({
       <Group align="flex-start" wrap="nowrap" gap="sm">
         {/* Date column */}
         <Stack gap={0} style={{ width: 72, flexShrink: 0, textAlign: "right" }}>
-          <Text size="xs" fw={500} c="dimmed">{dateStr}</Text>
-          <Text size="xs" c="dimmed">{timeStr}</Text>
+          <Text size="xs" fw={500} c="dimmed">
+            {dateStr}
+          </Text>
+          <Text size="xs" c="dimmed">
+            {timeStr}
+          </Text>
         </Stack>
 
         <Divider orientation="vertical" />
@@ -696,14 +765,20 @@ function ConversationCard({
               {conv.title}
             </Text>
             {isTranscribing && (
-              <Badge size="xs" color="yellow" variant="dot">transcribing…</Badge>
+              <Badge size="xs" color="yellow" variant="dot">
+                transcribing…
+              </Badge>
             )}
             {hasTranscript && (
-              <Badge size="xs" color="teal" variant="dot">transcript</Badge>
+              <Badge size="xs" color="teal" variant="dot">
+                transcript
+              </Badge>
             )}
           </Group>
           {conv.type === "review" && typeof conv.content === "string" && conv.content && (
-            <Text size="xs" c="dimmed" lineClamp={2}>{conv.content}</Text>
+            <Text size="xs" c="dimmed" lineClamp={2}>
+              {conv.content}
+            </Text>
           )}
           {conv.stats.duration_seconds != null && (
             <Text size="xs" c="dimmed">
@@ -713,7 +788,9 @@ function ConversationCard({
           {conv.metadata.length > 0 && (
             <Group gap={4}>
               {conv.metadata.map((m) => (
-                <Badge key={m.key} size="xs" variant="outline" color="gray">{m.key}: {m.value}</Badge>
+                <Badge key={m.key} size="xs" variant="outline" color="gray">
+                  {m.key}: {m.value}
+                </Badge>
               ))}
             </Group>
           )}
@@ -721,8 +798,16 @@ function ConversationCard({
 
         {canMutate && (
           <Group gap={4} wrap="nowrap">
-            <Button size="xs" variant="subtle" onClick={onEdit}>Edit</Button>
-            <Button size="xs" variant="subtle" color="red" loading={deleteLoading} onClick={onDelete}>
+            <Button size="xs" variant="subtle" onClick={onEdit}>
+              Edit
+            </Button>
+            <Button
+              size="xs"
+              variant="subtle"
+              color="red"
+              loading={deleteLoading}
+              onClick={onDelete}
+            >
               Delete
             </Button>
           </Group>

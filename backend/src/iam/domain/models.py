@@ -39,12 +39,13 @@ class Group:
     id: UUID
     name: str
     org_id: UUID
+    owner_id: UUID
     member_ids: list[UUID] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
-    def create(cls, name: str, org_id: UUID) -> "Group":
-        return cls(id=uuid4(), name=name, org_id=org_id)
+    def create(cls, name: str, org_id: UUID, owner_id: UUID) -> "Group":
+        return cls(id=uuid4(), name=name, org_id=org_id, owner_id=owner_id)
 
     def add_member(self, user_id: UUID) -> None:
         if user_id not in self.member_ids:

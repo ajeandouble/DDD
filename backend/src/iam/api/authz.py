@@ -71,6 +71,7 @@ class GroupResponse(BaseModel):
     id: UUID
     name: str
     org_id: UUID
+    owner_id: UUID
     member_ids: list[UUID]
     created_at: str
 
@@ -122,6 +123,7 @@ def _group_resp(g: Group) -> GroupResponse:
         id=g.id,
         name=g.name,
         org_id=g.org_id,
+        owner_id=g.owner_id,
         member_ids=g.member_ids,
         created_at=g.created_at.isoformat(),
     )
@@ -172,8 +174,12 @@ async def assign_role(
     if not await authz.can_assign(
         f"user:{user.id}", body.role, body.scope_type, str(body.scope_id), org_id=str(org_id)
     ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
-    await authz.assign_role(body.subject, body.role, body.scope_type, str(body.scope_id))
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
+    await authz.assign_role(
+        body.subject, body.role, body.scope_type, str(body.scope_id), org_id=str(org_id)
+    )
 
 
 @router.post("/organizations/{org_id}/roles/revoke", status_code=status.HTTP_204_NO_CONTENT)
@@ -184,11 +190,15 @@ async def revoke_role(
     authz: AuthorizationService = Depends(get_authz),
 ):
     if body.subject == f"user:{user.id}" and not authz.is_superadmin(f"user:{user.id}"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot revoke your own role")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Cannot revoke your own role"
+        )
     if not await authz.can_assign(
         f"user:{user.id}", body.role, body.scope_type, str(body.scope_id), org_id=str(org_id)
     ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
     try:
         await authz.revoke_role(body.subject, body.role, body.scope_type, str(body.scope_id))
     except NotAuthorized as e:
@@ -207,9 +217,29 @@ async def list_groups(
     authz: AuthorizationService = Depends(get_authz),
     repo: MongoGroupRepository = Depends(_group_repo),
 ):
-    if not await authz.can_do(f"user:{user.id}", "read", "org", str(org_id), org_id=str(org_id)):
+    org = await get_db()["organizations"].find_one({"_id": org_id, "member_ids": user.id})
+    if org is None and not authz.is_superadmin(f"user:{user.id}"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     return [_group_resp(g) for g in await repo.find_by_org(org_id)]
+
+
+class GroupCreateBody(BaseModel):
+    name: str
+    scope_type: str | None = None
+    scope_id: UUID | None = None
+
+
+async def _require_group_write(
+    group: Group, org_id: UUID, user: User, authz: AuthorizationService
+) -> None:
+    """Owner of the group, or org supervisor/admin."""
+    if group.owner_id == user.id:
+        return
+    if await authz.can_do(
+        f"user:{user.id}", "manage_members", "org", str(org_id), org_id=str(org_id)
+    ):
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
 
 
 @router.post(
@@ -219,13 +249,22 @@ async def list_groups(
 )
 async def create_group(
     org_id: UUID,
-    body: GroupCreate,
+    body: GroupCreateBody,
     user: User = Depends(get_current_user),
     authz: AuthorizationService = Depends(get_authz),
     repo: MongoGroupRepository = Depends(_group_repo),
 ):
-    await _require_manage_members(org_id, user, authz)
-    group = Group.create(name=body.name, org_id=org_id)
+    subject = f"user:{user.id}"
+    can = await authz.can_do(subject, "manage_members", "org", str(org_id), org_id=str(org_id))
+    if not can and body.scope_type and body.scope_id:
+        can = await authz.can_do(
+            subject, "manage_members", body.scope_type, str(body.scope_id), org_id=str(org_id)
+        )
+    if not can:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        )
+    group = Group.create(name=body.name, org_id=org_id, owner_id=user.id)
     await repo.save(group)
     return _group_resp(group)
 
@@ -238,10 +277,10 @@ async def delete_group(
     authz: AuthorizationService = Depends(get_authz),
     repo: MongoGroupRepository = Depends(_group_repo),
 ):
-    await _require_manage_members(org_id, user, authz)
     group = await repo.find_by_id(group_id)
     if group is None or group.org_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    await _require_group_write(group, org_id, user, authz)
     await repo.delete(group_id)
 
 
@@ -257,10 +296,10 @@ async def add_group_member(
     authz: AuthorizationService = Depends(get_authz),
     repo: MongoGroupRepository = Depends(_group_repo),
 ):
-    await _require_manage_members(org_id, user, authz)
     group = await repo.find_by_id(group_id)
     if group is None or group.org_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    await _require_group_write(group, org_id, user, authz)
     group.add_member(body.user_id)
     await repo.save(group)
     return _group_resp(group)
@@ -283,10 +322,10 @@ async def remove_group_member(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot remove yourself from a group",
         )
-    await _require_manage_members(org_id, user, authz)
     group = await repo.find_by_id(group_id)
     if group is None or group.org_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    await _require_group_write(group, org_id, user, authz)
     group.remove_member(member_id)
     await repo.save(group)
     return _group_resp(group)
@@ -384,10 +423,15 @@ async def list_role_assignments(
     user: User = Depends(get_current_user),
     authz: AuthorizationService = Depends(get_authz),
 ):
-    if not await authz.can_do(f"user:{user.id}", "read", "org", str(org_id), org_id=str(org_id)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
-
+    subject = f"user:{user.id}"
     db = get_db()
+
+    if scope_type and scope_id:
+        if not await authz.can_do(subject, "read", scope_type, str(scope_id), org_id=str(org_id)):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    else:
+        if not await authz.can_do(subject, "read", "org", str(org_id), org_id=str(org_id)):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
 
     if scope_type and scope_id:
         domains = [f"{scope_type}:{scope_id}"]
@@ -395,8 +439,7 @@ async def list_role_assignments(
         # Collect all scope domains belonging to this org
         domains = [f"org:{org_id}"]
         project_ids = [
-            doc["_id"]
-            async for doc in db["projects"].find({"organization_id": org_id}, {"_id": 1})
+            doc["_id"] async for doc in db["projects"].find({"organization_id": org_id}, {"_id": 1})
         ]
         domains.extend(f"project:{pid}" for pid in project_ids)
         subproject_ids = []
@@ -449,7 +492,9 @@ async def my_roles(
 
     org_role = await authz.effective_role(subject, "org", oid, org_id=oid)
 
-    project_ids = [doc["_id"] async for doc in db["projects"].find({"organization_id": org_id}, {"_id": 1})]
+    project_ids = [
+        doc["_id"] async for doc in db["projects"].find({"organization_id": org_id}, {"_id": 1})
+    ]
     project_roles = {
         str(pid): await authz.effective_role(subject, "project", str(pid), org_id=oid)
         for pid in project_ids
@@ -467,7 +512,9 @@ async def my_roles(
     campaign_roles: dict[str, str | None] = {}
     async for doc in db["campaigns"].find({"organization_id": org_id}, {"_id": 1}):
         cid = doc["_id"]
-        campaign_roles[str(cid)] = await authz.effective_role(subject, "campaign", str(cid), org_id=oid)
+        campaign_roles[str(cid)] = await authz.effective_role(
+            subject, "campaign", str(cid), org_id=oid
+        )
 
     return MyRolesResponse(
         org=org_role,

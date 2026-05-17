@@ -1,8 +1,17 @@
 import re
 from uuid import UUID
 
-from src.conversations.domain.models import Conversation, ConversationStats, ScopeType
-from src.conversations.domain.repositories import ConversationFilter, ConversationRepository, PagedResult
+from src.conversations.domain.models import (
+    Conversation,
+    ConversationStats,
+    ConversationType,
+    ScopeType,
+)
+from src.conversations.domain.repositories import (
+    ConversationFilter,
+    ConversationRepository,
+    PagedResult,
+)
 from src.shared.mongo_repository import MongoRepository
 
 
@@ -11,9 +20,10 @@ def _to_doc(c: Conversation) -> dict:
         "_id": c.id,
         "title": c.title,
         "content": c.content,
-        "timestamp": c.timestamp,
+        "type": c.type,
+        "conversation_timestamp": c.conversation_timestamp,
+        "created_at": c.created_at,
         "metadata": [list(pair) for pair in c.metadata],
-        "emit_webhook": c.emit_webhook,
         "created_by": c.created_by,
         "organization_id": c.organization_id,
         "scope_id": c.scope_id,
@@ -33,9 +43,10 @@ def _from_doc(doc: dict) -> Conversation:
         id=doc["_id"],
         title=doc["title"],
         content=doc["content"],
-        timestamp=doc["timestamp"],
+        type=doc.get("type", "review"),
+        conversation_timestamp=doc["conversation_timestamp"],
+        created_at=doc.get("created_at", doc["conversation_timestamp"]),
         metadata=[tuple(pair) for pair in doc.get("metadata", [])],
-        emit_webhook=doc.get("emit_webhook", False),
         created_by=doc["created_by"],
         organization_id=doc.get("organization_id"),
         scope_id=doc.get("scope_id"),
@@ -68,7 +79,11 @@ def _build_filter_clause(f: ConversationFilter) -> dict | None:
     if f.field == "meta":
         if not f.meta_key:
             return None
-        return {"metadata": {"$elemMatch": {"key": f.meta_key, "value": _string_condition(f.op, f.value)}}}
+        return {
+            "metadata": {
+                "$elemMatch": {"key": f.meta_key, "value": _string_condition(f.op, f.value)}
+            }
+        }
     if f.field in ("stats.word_count", "stats.duration_seconds"):
         if not f.value.lstrip("-+").replace(".", "", 1).isdigit():
             return None
@@ -109,7 +124,7 @@ class MongoConversationRepository(MongoRepository, ConversationRepository):
             query["scope_id"] = None
         if scope_type is not None:
             query["scope_type"] = scope_type
-        docs = await self._col.find(query).sort("timestamp", -1).to_list(length=limit)
+        docs = await self._col.find(query).sort("conversation_timestamp", -1).to_list(length=limit)
         return [_from_doc(d) for d in docs]
 
     async def update(self, conversation: Conversation) -> None:
@@ -125,12 +140,17 @@ class MongoConversationRepository(MongoRepository, ConversationRepository):
         filters: list[ConversationFilter],
         page: int,
         page_size: int,
-        sort_by: str = "timestamp",
+        sort_by: str = "conversation_timestamp",
         sort_dir: int = -1,
     ) -> PagedResult:
-        _SORTABLE = {"timestamp", "title", "stats.word_count", "stats.duration_seconds"}
+        _SORTABLE = {
+            "conversation_timestamp",
+            "title",
+            "stats.word_count",
+            "stats.duration_seconds",
+        }
         if sort_by not in _SORTABLE:
-            sort_by = "timestamp"
+            sort_by = "conversation_timestamp"
 
         query: dict = {}
         if organization_id is not None:
@@ -155,7 +175,9 @@ class MongoConversationRepository(MongoRepository, ConversationRepository):
             .limit(page_size)
             .to_list(length=page_size)
         )
-        return PagedResult(items=[_from_doc(d) for d in docs], total=total, page=page, page_size=page_size)
+        return PagedResult(
+            items=[_from_doc(d) for d in docs], total=total, page=page, page_size=page_size
+        )
 
     async def delete(self, conversation_id: UUID) -> None:
         await self._col.delete_one({"_id": conversation_id})

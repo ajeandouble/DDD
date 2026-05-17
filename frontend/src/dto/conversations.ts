@@ -45,7 +45,18 @@ export const ConversationResponse = z.object({
 
 export const ConversationCreateRequest = z.object({
   title: z.string().min(1),
-  content: z.union([z.string(), z.array(z.object({ speaker: z.string(), text: z.string(), words: z.array(z.object({ word: z.string(), start: z.number(), end: z.number() })).optional() }))]),
+  content: z.union([
+    z.string(),
+    z.array(
+      z.object({
+        speaker: z.string(),
+        text: z.string(),
+        words: z
+          .array(z.object({ word: z.string(), start: z.number(), end: z.number() }))
+          .optional(),
+      })
+    ),
+  ]),
   type: z.enum(["review", "conversation"]).default("review"),
   conversation_timestamp: z.string().optional(),
   metadata: z.array(MetadataEntry).default([]),

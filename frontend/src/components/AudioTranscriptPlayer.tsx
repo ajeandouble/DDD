@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import WaveSurfer from "wavesurfer.js";
-import { Box, Text, ActionIcon, Group, useMantineTheme, useComputedColorScheme } from "@mantine/core";
+import {
+  Box,
+  Text,
+  ActionIcon,
+  Group,
+  useMantineTheme,
+  useComputedColorScheme,
+} from "@mantine/core";
 import { IconPlayerPlay, IconPlayerPause } from "@tabler/icons-react";
 import type { SpeakerTurn, TranscriptWord } from "../dto/conversations";
 
@@ -114,11 +121,14 @@ export function AudioTranscriptPlayer({ audioUrl, turns, duration }: Props) {
     }, 3000);
   }, []);
 
-  const seekTo = useCallback((start: number) => {
-    if (!wsRef.current || duration <= 0) return;
-    wsRef.current.seekTo(Math.max(0, Math.min(1, start / duration)));
-    wsRef.current.play();
-  }, [duration]);
+  const seekTo = useCallback(
+    (start: number) => {
+      if (!wsRef.current || duration <= 0) return;
+      wsRef.current.seekTo(Math.max(0, Math.min(1, start / duration)));
+      wsRef.current.play();
+    },
+    [duration]
+  );
 
   const isDark = scheme === "dark";
 
@@ -126,11 +136,7 @@ export function AudioTranscriptPlayer({ audioUrl, turns, duration }: Props) {
     <Box>
       {/* Waveform + play/pause */}
       <Group gap="xs" align="center">
-        <ActionIcon
-          size="lg"
-          variant="light"
-          onClick={() => wsRef.current?.playPause()}
-        >
+        <ActionIcon size="lg" variant="light" onClick={() => wsRef.current?.playPause()}>
           {isPlaying ? <IconPlayerPause size={18} /> : <IconPlayerPlay size={18} />}
         </ActionIcon>
         <Box
@@ -158,7 +164,7 @@ export function AudioTranscriptPlayer({ audioUrl, turns, duration }: Props) {
         }}
       >
         {turns.map((turn, ti) => {
-          const colorKey = SPEAKER_NAMES.indexOf(turn.speaker as typeof SPEAKER_NAMES[number]);
+          const colorKey = SPEAKER_NAMES.indexOf(turn.speaker as (typeof SPEAKER_NAMES)[number]);
           const color = theme.colors[colorKey === 1 ? "violet" : "blue"][6];
 
           return (
@@ -170,7 +176,7 @@ export function AudioTranscriptPlayer({ audioUrl, turns, duration }: Props) {
                 {turn.words.length > 0
                   ? turn.words.map((w, wi) => {
                       const flatIdx = wordIndex.findIndex(
-                        (e) => e.turnIdx === ti && e.wordIdx === wi,
+                        (e) => e.turnIdx === ti && e.wordIdx === wi
                       );
                       const isActive = flatIdx === activeWordIdx;
                       const key = `${ti}-${wi}`;

@@ -25,7 +25,12 @@ export const getConversations = (params?: {
   return api.get("conversations/", { headers: authHeaders(), searchParams }).json();
 };
 
-export type FilterField = "title" | "content" | "meta" | "stats.word_count" | "stats.duration_seconds";
+export type FilterField =
+  | "title"
+  | "content"
+  | "meta"
+  | "stats.word_count"
+  | "stats.duration_seconds";
 export type FilterOp = "eq" | "contains" | "regex" | "gt" | "gte" | "lt" | "lte";
 
 export interface ConvFilter {
@@ -44,10 +49,16 @@ export interface PagedConversations {
 
 export const searchConversations = (
   params: { organization_id?: string; scope_id?: string; scope_type?: string },
-  body: { filters: ConvFilter[]; page: number; page_size: number; sort_by: string; sort_dir: number },
+  body: {
+    filters: ConvFilter[];
+    page: number;
+    page_size: number;
+    sort_by: string;
+    sort_dir: number;
+  }
 ): Promise<PagedConversations> => {
   const searchParams = Object.fromEntries(
-    Object.entries(params).filter(([, v]) => v != null),
+    Object.entries(params).filter(([, v]) => v != null)
   ) as Record<string, string>;
   return api
     .post("conversations/search", { json: body, headers: authHeaders(), searchParams })
@@ -56,7 +67,13 @@ export const searchConversations = (
 
 export const createConversation = (data: {
   title: string;
-  content: string | Array<{ speaker: string; text: string; words?: Array<{ word: string; start: number; end: number }> }>;
+  content:
+    | string
+    | Array<{
+        speaker: string;
+        text: string;
+        words?: Array<{ word: string; start: number; end: number }>;
+      }>;
   type?: "review" | "conversation";
   conversation_timestamp?: string;
   metadata?: { key: string; value: string }[];
@@ -122,13 +139,17 @@ export const getCampaignsByOrg = (orgId: string): Promise<Campaign[]> =>
   api.get(`scopes/organizations/${orgId}/campaigns/`, { headers: authHeaders() }).json();
 
 export const createCampaignUnderOrg = (orgId: string, name: string): Promise<Campaign> =>
-  api.post(`scopes/organizations/${orgId}/campaigns/`, { json: { name }, headers: authHeaders() }).json();
+  api
+    .post(`scopes/organizations/${orgId}/campaigns/`, { json: { name }, headers: authHeaders() })
+    .json();
 
 export const getCampaignsByProject = (projectId: string): Promise<Campaign[]> =>
   api.get(`scopes/projects/${projectId}/campaigns/`, { headers: authHeaders() }).json();
 
 export const createCampaignUnderProject = (projectId: string, name: string): Promise<Campaign> =>
-  api.post(`scopes/projects/${projectId}/campaigns/`, { json: { name }, headers: authHeaders() }).json();
+  api
+    .post(`scopes/projects/${projectId}/campaigns/`, { json: { name }, headers: authHeaders() })
+    .json();
 
 export const getCampaigns = (subprojectId: string): Promise<Campaign[]> =>
   api.get(`scopes/subprojects/${subprojectId}/campaigns/`, { headers: authHeaders() }).json();
@@ -148,12 +169,13 @@ export const listUsers = (): Promise<UserSummary[]> =>
 
 export const listRoles = (
   orgId: string,
-  opts?: { scope_type?: string; scope_id?: string },
+  opts?: { scope_type?: string; scope_id?: string }
 ): Promise<RoleAssignment[]> => {
   const searchParams = opts
-    ? (Object.fromEntries(
-        Object.entries(opts).filter(([, v]) => v != null),
-      ) as Record<string, string>)
+    ? (Object.fromEntries(Object.entries(opts).filter(([, v]) => v != null)) as Record<
+        string,
+        string
+      >)
     : undefined;
   return api
     .get(`iam/organizations/${orgId}/roles`, { headers: authHeaders(), searchParams })
@@ -162,7 +184,7 @@ export const listRoles = (
 
 export const assignRole = (
   orgId: string,
-  body: { subject: string; role: string; scope_type: string; scope_id: string },
+  body: { subject: string; role: string; scope_type: string; scope_id: string }
 ): Promise<void> =>
   api
     .post(`iam/organizations/${orgId}/roles/assign`, { json: body, headers: authHeaders() })
@@ -170,7 +192,7 @@ export const assignRole = (
 
 export const revokeRole = (
   orgId: string,
-  body: { subject: string; role: string; scope_type: string; scope_id: string },
+  body: { subject: string; role: string; scope_type: string; scope_id: string }
 ): Promise<void> =>
   api
     .post(`iam/organizations/${orgId}/roles/revoke`, { json: body, headers: authHeaders() })
@@ -183,7 +205,7 @@ export const createGroup = (
   orgId: string,
   name: string,
   scopeType?: string,
-  scopeId?: string,
+  scopeId?: string
 ): Promise<IamGroup> =>
   api
     .post(`iam/organizations/${orgId}/groups`, {
@@ -197,11 +219,7 @@ export const deleteGroup = (orgId: string, groupId: string): Promise<void> =>
     .delete(`iam/organizations/${orgId}/groups/${groupId}`, { headers: authHeaders() })
     .then(() => undefined);
 
-export const addGroupMember = (
-  orgId: string,
-  groupId: string,
-  userId: string,
-): Promise<IamGroup> =>
+export const addGroupMember = (orgId: string, groupId: string, userId: string): Promise<IamGroup> =>
   api
     .post(`iam/organizations/${orgId}/groups/${groupId}/members`, {
       json: { user_id: userId },
@@ -212,7 +230,7 @@ export const addGroupMember = (
 export const removeGroupMember = (
   orgId: string,
   groupId: string,
-  memberId: string,
+  memberId: string
 ): Promise<IamGroup> =>
   api
     .delete(`iam/organizations/${orgId}/groups/${groupId}/members/${memberId}`, {
@@ -249,37 +267,64 @@ export const listWebhookEndpoints = (orgId: string): Promise<WebhookEndpoint[]> 
 
 export const createWebhookEndpoint = (
   orgId: string,
-  body: { url: string; secret?: string; event_types: string[]; transformer: string; enabled: boolean },
+  body: {
+    url: string;
+    secret?: string;
+    event_types: string[];
+    transformer: string;
+    enabled: boolean;
+  }
 ): Promise<WebhookEndpoint> =>
-  api.post(`webhooks/organizations/${orgId}/endpoints`, { json: body, headers: authHeaders() }).json();
+  api
+    .post(`webhooks/organizations/${orgId}/endpoints`, { json: body, headers: authHeaders() })
+    .json();
 
 export const updateWebhookEndpoint = (
   orgId: string,
   epId: string,
-  body: Partial<{ url: string; secret: string; event_types: string[]; transformer: string; enabled: boolean }>,
+  body: Partial<{
+    url: string;
+    secret: string;
+    event_types: string[];
+    transformer: string;
+    enabled: boolean;
+  }>
 ): Promise<WebhookEndpoint> =>
-  api.patch(`webhooks/organizations/${orgId}/endpoints/${epId}`, { json: body, headers: authHeaders() }).json();
+  api
+    .patch(`webhooks/organizations/${orgId}/endpoints/${epId}`, {
+      json: body,
+      headers: authHeaders(),
+    })
+    .json();
 
 export const deleteWebhookEndpoint = (orgId: string, epId: string): Promise<void> =>
-  api.delete(`webhooks/organizations/${orgId}/endpoints/${epId}`, { headers: authHeaders() }).then(() => undefined);
+  api
+    .delete(`webhooks/organizations/${orgId}/endpoints/${epId}`, { headers: authHeaders() })
+    .then(() => undefined);
 
 export const listDeliveries = (orgId: string, epId: string): Promise<Delivery[]> =>
-  api.get(`webhooks/organizations/${orgId}/endpoints/${epId}/deliveries`, { headers: authHeaders() }).json();
+  api
+    .get(`webhooks/organizations/${orgId}/endpoints/${epId}/deliveries`, { headers: authHeaders() })
+    .json();
 
 export const testTransformer = (
   transformer: string,
-  payload: Record<string, unknown>,
+  payload: Record<string, unknown>
 ): Promise<{ result: Record<string, unknown> | null; error: string | null; stdout: string }> =>
-  api.post("webhooks/transformer/test", { json: { transformer, payload }, headers: authHeaders() }).json();
+  api
+    .post("webhooks/transformer/test", { json: { transformer, payload }, headers: authHeaders() })
+    .json();
 
 // --- Imports ---
 
-export const getImportJobs = (conversationId: string): Promise<{ id: string; storage_key: string | null; status: string }[]> =>
+export const getImportJobs = (
+  conversationId: string
+): Promise<{ id: string; storage_key: string | null; status: string }[]> =>
   api.get(`imports/conversation/${conversationId}`, { headers: authHeaders() }).json();
 
 export const uploadAudio = (
   conversationId: string,
-  file: File,
+  file: File
 ): Promise<{ id: string; status: string; storage_key: string | null }> => {
   const form = new FormData();
   form.append("conversation_id", conversationId);

@@ -9,7 +9,10 @@ from src.shared.database import get_db
 from src.shared.deps import get_authz, get_current_user
 from src.webhooks.application import run_transformer
 from src.webhooks.domain import WebhookEndpoint
-from src.webhooks.infrastructure.repositories import MongoDeliveryRepository, MongoWebhookEndpointRepository
+from src.webhooks.infrastructure.repositories import (
+    MongoDeliveryRepository,
+    MongoWebhookEndpointRepository,
+)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -31,6 +34,7 @@ async def _require_admin(org_id: UUID, user: User, authz: AuthorizationService) 
 
 
 # --- Schemas ---
+
 
 class EndpointCreate(BaseModel):
     url: str
@@ -95,6 +99,7 @@ def _ep_resp(ep: WebhookEndpoint) -> EndpointResponse:
 
 
 # --- Endpoints CRUD ---
+
 
 @router.get("/organizations/{org_id}/endpoints", response_model=list[EndpointResponse])
 async def list_endpoints(
@@ -175,7 +180,10 @@ async def delete_endpoint(
 
 # --- Deliveries ---
 
-@router.get("/organizations/{org_id}/endpoints/{ep_id}/deliveries", response_model=list[DeliveryResponse])
+
+@router.get(
+    "/organizations/{org_id}/endpoints/{ep_id}/deliveries", response_model=list[DeliveryResponse]
+)
 async def list_deliveries(
     org_id: UUID,
     ep_id: UUID,
@@ -205,6 +213,7 @@ async def list_deliveries(
 
 
 # --- Transformer test (dry-run) ---
+
 
 @router.post("/transformer/test", response_model=TransformerTestResponse)
 async def test_transformer(

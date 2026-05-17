@@ -13,7 +13,7 @@ export function useMyRoles(orgId: string | undefined) {
 export function useCanManageMembers(
   orgId: string | undefined,
   scopeType: ScopeType,
-  scopeId: string | undefined,
+  scopeId: string | undefined
 ): boolean {
   const { data } = useMyRoles(orgId);
   if (!data || !scopeId) return false;

@@ -1,5 +1,3 @@
-import json
-
 from src.analyzer.domain.events import TranscriptReady
 from src.conversations.domain.events import ConversationTranscribed
 from src.conversations.domain.models import ConversationStats
@@ -14,7 +12,8 @@ async def on_transcript_ready(event: TranscriptReady) -> None:
     conv = await repo.find_by_id(event.conversation_id)
     if conv is None:
         return
-    conv.content = json.dumps(event.speaker_turns)
+    conv.type = "conversation"
+    conv.content = event.speaker_turns
     conv.stats = ConversationStats(
         word_count=event.word_count,
         duration_seconds=event.duration_seconds,
@@ -26,10 +25,10 @@ async def on_transcript_ready(event: TranscriptReady) -> None:
             conversation_id=conv.id,
             org_id=conv.organization_id,
             title=conv.title,
-            timestamp=conv.timestamp.isoformat(),
+            conversation_timestamp=conv.conversation_timestamp.isoformat(),
             scope_type=conv.scope_type,
             scope_id=conv.scope_id,
-            metadata=[{"key": m.key, "value": m.value} for m in conv.metadata],
+            metadata=[{"key": k, "value": v} for k, v in conv.metadata],
             speaker_turns=event.speaker_turns,
             stats={"word_count": event.word_count, "duration_seconds": event.duration_seconds},
         )

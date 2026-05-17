@@ -57,6 +57,7 @@ def _group_to_doc(group: Group) -> dict:
         "_id": group.id,
         "name": group.name,
         "org_id": group.org_id,
+        "owner_id": group.owner_id,
         "member_ids": list(group.member_ids),
         "created_at": group.created_at,
     }
@@ -67,6 +68,7 @@ def _group_from_doc(doc: dict) -> Group:
         id=doc["_id"],
         name=doc["name"],
         org_id=doc["org_id"],
+        owner_id=doc["owner_id"],
         member_ids=list(doc.get("member_ids", [])),
         created_at=doc["created_at"],
     )

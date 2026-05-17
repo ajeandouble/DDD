@@ -12,7 +12,10 @@ from src.conversations.domain.events import ConversationTranscribed
 from src.shared.database import get_db
 from src.shared.events import subscribe
 from src.webhooks.domain import Delivery, DeliveryStatus, WebhookEndpoint
-from src.webhooks.infrastructure.repositories import MongoDeliveryRepository, MongoWebhookEndpointRepository
+from src.webhooks.infrastructure.repositories import (
+    MongoDeliveryRepository,
+    MongoWebhookEndpointRepository,
+)
 
 EVENT_CONVERSATION_TRANSCRIBED = "conversation.transcribed"
 
@@ -48,7 +51,11 @@ def run_transformer(code: str, payload: dict) -> tuple[dict | None, str | None, 
     stdout = locs["_print"]() if "_print" in locs else ""
     result = locs.get("result")
     if not isinstance(result, dict):
-        return None, f"Transformer must assign a dict to `result`, got {type(result).__name__}", stdout
+        return (
+            None,
+            f"Transformer must assign a dict to `result`, got {type(result).__name__}",
+            stdout,
+        )
 
     return result, None, stdout
 
@@ -103,7 +110,7 @@ async def on_conversation_transcribed(event: ConversationTranscribed) -> None:
         "conversation_id": str(event.conversation_id),
         "org_id": str(event.org_id),
         "title": event.title,
-        "timestamp": event.timestamp,
+        "conversation_timestamp": event.conversation_timestamp,
         "scope_type": event.scope_type,
         "scope_id": str(event.scope_id) if event.scope_id else None,
         "metadata": event.metadata,

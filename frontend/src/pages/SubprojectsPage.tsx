@@ -53,7 +53,11 @@ export function SubprojectsPage() {
     retry: false,
   });
 
-  const { data: subprojects, isLoading: subprojectsLoading, error: subprojectsError } = useQuery({
+  const {
+    data: subprojects,
+    isLoading: subprojectsLoading,
+    error: subprojectsError,
+  } = useQuery({
     queryKey: ["subprojects", projectId],
     queryFn: () => getSubprojects(projectId!),
     retry: false,

@@ -7,7 +7,7 @@ class ConversationTranscribed:
     conversation_id: UUID
     org_id: UUID
     title: str
-    timestamp: str  # ISO 8601
+    conversation_timestamp: str  # ISO 8601
     scope_type: str | None
     scope_id: UUID | None
     metadata: list[dict]

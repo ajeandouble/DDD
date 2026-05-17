@@ -36,10 +36,7 @@ def _compute_speaker_turns(segments: list) -> list[dict]:
         if i > 0 and seg.start - segments[i - 1].end > 1.5:
             speaker ^= 1
         label = f"Speaker {'AB'[speaker]}"
-        seg_words = [
-            {"word": w.word, "start": w.start, "end": w.end}
-            for w in (seg.words or [])
-        ]
+        seg_words = [{"word": w.word, "start": w.start, "end": w.end} for w in (seg.words or [])]
         if turns and turns[-1]["speaker"] == label:
             turns[-1]["text"] += " " + seg.text.strip()
             turns[-1]["words"].extend(seg_words)

@@ -265,7 +265,9 @@ async def add_member(
 ):
     subj = principal_subject(principal)
     owner_id = principal.id if isinstance(principal, User) else principal.owner_id
-    await _require(await authz.can_do(subj, "manage_members", "org", str(org_id), org_id=str(org_id)))
+    await _require(
+        await authz.can_do(subj, "manage_members", "org", str(org_id), org_id=str(org_id))
+    )
     try:
         org = await commands.add_member(
             AddMemberCommand(org_id=org_id, user_id=body.user_id, requesting_user_id=owner_id)
@@ -289,11 +291,15 @@ async def list_projects(
     authz: AuthorizationService = Depends(get_authz),
 ):
     org = await org_queries.get_by_id(org_id)
-    subject = f"user:{principal.id}" if isinstance(principal, User) else f"apikey:{principal.id}"
+    subj = principal_subject(principal)
     owner_id = principal.id if isinstance(principal, User) else principal.owner_id
-    if org is None or (not authz.is_superadmin(subject) and not org.is_member(owner_id)):
+    if org is None or (not authz.is_superadmin(subj) and not org.is_member(owner_id)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
-    return [_project_resp(p) for p in await queries.list_by_org(org_id)]
+    all_projects = await queries.list_by_org(org_id)
+    allowed = await authz.accessible_project_ids(subj, str(org_id))
+    if allowed is None:
+        return [_project_resp(p) for p in all_projects]
+    return [_project_resp(p) for p in all_projects if p.id in allowed]
 
 
 @router.post(
@@ -313,7 +319,12 @@ async def create_project(
     await _require(await authz.can_do(subj, "write", "org", str(org_id), org_id=str(org_id)))
     try:
         project = await commands.create(
-            CreateProjectCommand(name=body.name, organization_id=org_id, requesting_user_id=owner_id)
+            CreateProjectCommand(
+                name=body.name,
+                organization_id=org_id,
+                requesting_user_id=owner_id,
+                bypass_membership=authz.is_superadmin(subj),
+            )
         )
     except ScopeNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
@@ -329,7 +340,12 @@ async def create_project(
 async def list_org_campaigns(
     org_id: UUID,
     queries: CampaignQueryHandler = Depends(_campaign_queries),
+    principal: Principal = Depends(get_current_principal),
 ):
+    owner_id = principal.id if isinstance(principal, User) else principal.owner_id
+    org = await get_db()["organizations"].find_one({"_id": org_id, "member_ids": owner_id})
+    if org is None:
+        return []
     return [_campaign_resp(c) for c in await queries.list_by_parent(org_id)]
 
 
@@ -360,6 +376,7 @@ async def create_org_campaign(
                 parent_id=org_id,
                 org_id=org_id,
                 requesting_user_id=owner_id,
+                bypass_membership=authz.is_superadmin(subj),
             )
         )
     except ScopeNotFound:
@@ -390,8 +407,21 @@ async def get_project(
 async def list_subprojects(
     project_id: UUID,
     queries: SubprojectQueryHandler = Depends(_subproject_queries),
+    project_queries: ProjectQueryHandler = Depends(_project_queries),
+    principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
 ):
-    return [_subproject_resp(sp) for sp in await queries.list_by_project(project_id)]
+    project = await project_queries.get_by_id(project_id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    subj = principal_subject(principal)
+    all_sps = await queries.list_by_project(project_id)
+    allowed = await authz.accessible_subproject_ids(
+        subj, str(project_id), str(project.organization_id)
+    )
+    if allowed is None:
+        return [_subproject_resp(sp) for sp in all_sps]
+    return [_subproject_resp(sp) for sp in all_sps if sp.id in allowed]
 
 
 @router.post(
@@ -413,7 +443,9 @@ async def create_subproject(
     subj = principal_subject(principal)
     owner_id = principal.id if isinstance(principal, User) else principal.owner_id
     await _require(
-        await authz.can_do(subj, "write", "project", str(project_id), org_id=str(project.organization_id))
+        await authz.can_do(
+            subj, "write", "project", str(project_id), org_id=str(project.organization_id)
+        )
     )
     try:
         sp = await commands.create(
@@ -422,6 +454,7 @@ async def create_subproject(
                 project_id=project_id,
                 org_id=project.organization_id,
                 requesting_user_id=owner_id,
+                bypass_membership=authz.is_superadmin(subj),
             )
         )
     except ScopeNotFound:
@@ -438,7 +471,19 @@ async def create_subproject(
 async def list_project_campaigns(
     project_id: UUID,
     queries: CampaignQueryHandler = Depends(_campaign_queries),
+    project_queries: ProjectQueryHandler = Depends(_project_queries),
+    principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
 ):
+    project = await project_queries.get_by_id(project_id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    subj = principal_subject(principal)
+    await _require(
+        await authz.can_do(
+            subj, "read", "project", str(project_id), org_id=str(project.organization_id)
+        )
+    )
     return [_campaign_resp(c) for c in await queries.list_by_parent(project_id)]
 
 
@@ -503,7 +548,20 @@ async def get_subproject(
 async def list_subproject_campaigns(
     subproject_id: UUID,
     queries: CampaignQueryHandler = Depends(_campaign_queries),
+    subproject_queries: SubprojectQueryHandler = Depends(_subproject_queries),
+    project_queries: ProjectQueryHandler = Depends(_project_queries),
+    principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
 ):
+    sp = await subproject_queries.get_by_id(subproject_id)
+    if sp is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    project = await project_queries.get_by_id(sp.project_id)
+    subj = principal_subject(principal)
+    org_id = str(project.organization_id) if project else None
+    await _require(
+        await authz.can_do(subj, "read", "subproject", str(subproject_id), org_id=org_id)
+    )
     return [_campaign_resp(c) for c in await queries.list_by_parent(subproject_id)]
 
 
@@ -542,6 +600,7 @@ async def create_subproject_campaign(
                 parent_id=subproject_id,
                 org_id=project.organization_id,
                 requesting_user_id=owner_id,
+                bypass_membership=authz.is_superadmin(subj),
             )
         )
     except ScopeNotFound:

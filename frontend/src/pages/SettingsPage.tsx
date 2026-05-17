@@ -81,13 +81,19 @@ export function SettingsPage() {
   const { data: projects } = useQuery({
     queryKey: ["projects", selectedOrgId],
     queryFn: () => getProjects(selectedOrgId!),
-    enabled: createOpened && !!selectedOrgId && (scopeType === "project" || scopeType === "subproject" || scopeType === "campaign"),
+    enabled:
+      createOpened &&
+      !!selectedOrgId &&
+      (scopeType === "project" || scopeType === "subproject" || scopeType === "campaign"),
   });
 
   const { data: subprojects } = useQuery({
     queryKey: ["subprojects", selectedProjectId],
     queryFn: () => getSubprojects(selectedProjectId!),
-    enabled: createOpened && !!selectedProjectId && (scopeType === "subproject" || scopeType === "campaign"),
+    enabled:
+      createOpened &&
+      !!selectedProjectId &&
+      (scopeType === "subproject" || scopeType === "campaign"),
   });
 
   const { data: campaigns } = useQuery({
@@ -98,11 +104,16 @@ export function SettingsPage() {
 
   const scopeId = (): string | undefined => {
     switch (scopeType) {
-      case "org": return selectedOrgId ?? undefined;
-      case "project": return selectedProjectId ?? undefined;
-      case "subproject": return selectedSubprojectId ?? undefined;
-      case "campaign": return selectedCampaignId ?? undefined;
-      default: return undefined;
+      case "org":
+        return selectedOrgId ?? undefined;
+      case "project":
+        return selectedProjectId ?? undefined;
+      case "subproject":
+        return selectedSubprojectId ?? undefined;
+      case "campaign":
+        return selectedCampaignId ?? undefined;
+      default:
+        return undefined;
     }
   };
 
@@ -162,7 +173,11 @@ export function SettingsPage() {
           </Button>
         </Group>
 
-        {isLoading && <Text size="sm" c="dimmed">Loading…</Text>}
+        {isLoading && (
+          <Text size="sm" c="dimmed">
+            Loading…
+          </Text>
+        )}
         {keys?.length === 0 && (
           <Text size="sm" c="dimmed">
             No API keys yet.
@@ -221,7 +236,15 @@ export function SettingsPage() {
       </Stack>
 
       {/* Create modal */}
-      <Modal opened={createOpened} onClose={() => { closeCreate(); resetForm(); }} title="New API Key" size="md">
+      <Modal
+        opened={createOpened}
+        onClose={() => {
+          closeCreate();
+          resetForm();
+        }}
+        title="New API Key"
+        size="md"
+      >
         <Stack gap="sm">
           <TextInput
             label="Name"
@@ -251,27 +274,40 @@ export function SettingsPage() {
               placeholder="Select org"
               data={orgs?.map((o) => ({ value: o.id, label: o.name })) ?? []}
               value={selectedOrgId}
-              onChange={(v) => { setSelectedOrgId(v); setSelectedProjectId(null); setSelectedSubprojectId(null); setSelectedCampaignId(null); }}
+              onChange={(v) => {
+                setSelectedOrgId(v);
+                setSelectedProjectId(null);
+                setSelectedSubprojectId(null);
+                setSelectedCampaignId(null);
+              }}
               required
             />
           )}
-          {(scopeType === "project" || scopeType === "subproject" || scopeType === "campaign") && selectedOrgId && (
-            <Select
-              label="Project"
-              placeholder="Select project"
-              data={projects?.map((p) => ({ value: p.id, label: p.name })) ?? []}
-              value={selectedProjectId}
-              onChange={(v) => { setSelectedProjectId(v); setSelectedSubprojectId(null); setSelectedCampaignId(null); }}
-              required
-            />
-          )}
+          {(scopeType === "project" || scopeType === "subproject" || scopeType === "campaign") &&
+            selectedOrgId && (
+              <Select
+                label="Project"
+                placeholder="Select project"
+                data={projects?.map((p) => ({ value: p.id, label: p.name })) ?? []}
+                value={selectedProjectId}
+                onChange={(v) => {
+                  setSelectedProjectId(v);
+                  setSelectedSubprojectId(null);
+                  setSelectedCampaignId(null);
+                }}
+                required
+              />
+            )}
           {(scopeType === "subproject" || scopeType === "campaign") && selectedProjectId && (
             <Select
               label="Subproject"
               placeholder="Select subproject"
               data={subprojects?.map((s) => ({ value: s.id, label: s.name })) ?? []}
               value={selectedSubprojectId}
-              onChange={(v) => { setSelectedSubprojectId(v); setSelectedCampaignId(null); }}
+              onChange={(v) => {
+                setSelectedSubprojectId(v);
+                setSelectedCampaignId(null);
+              }}
               required
             />
           )}
@@ -327,8 +363,7 @@ export function SettingsPage() {
             )}
           </CopyButton>
           <Text size="xs" c="dimmed">
-            Use this key in the{" "}
-            <Code>Authorization: Bearer &lt;key&gt;</Code> header.
+            Use this key in the <Code>Authorization: Bearer &lt;key&gt;</Code> header.
           </Text>
         </Stack>
       </Modal>

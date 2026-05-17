@@ -46,7 +46,11 @@ export function ProjectsPage() {
     retry: false,
   });
 
-  const { data: projects, isLoading: projectsLoading, error: projectsError } = useQuery({
+  const {
+    data: projects,
+    isLoading: projectsLoading,
+    error: projectsError,
+  } = useQuery({
     queryKey: ["projects", orgId],
     queryFn: () => getProjects(orgId!),
     retry: false,

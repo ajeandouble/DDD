@@ -51,7 +51,7 @@ export function CampaignPage() {
     campaign,
     project,
     subproject,
-    subprojectProject,
+    subprojectProject
   );
 
   return (
@@ -96,7 +96,7 @@ function buildBreadcrumbs(
   campaign: { name: string; parent_type: string; parent_id: string } | undefined,
   project: { id: string; name: string } | undefined,
   subproject: { id: string; name: string; project_id: string } | undefined,
-  subprojectProject: { id: string; name: string } | undefined,
+  subprojectProject: { id: string; name: string } | undefined
 ) {
   const items: React.ReactNode[] = [
     <Anchor key="orgs" component={Link} to="/orgs" size="sm">
@@ -109,27 +109,17 @@ function buildBreadcrumbs(
 
   if (campaign?.parent_type === "project" && project) {
     items.push(
-      <Anchor
-        key="project"
-        component={Link}
-        to={`/orgs/${orgId}/projects/${project.id}`}
-        size="sm"
-      >
+      <Anchor key="project" component={Link} to={`/orgs/${orgId}/projects/${project.id}`} size="sm">
         {project.name}
-      </Anchor>,
+      </Anchor>
     );
   } else if (campaign?.parent_type === "subproject" && subproject) {
     const proj = subprojectProject;
     if (proj) {
       items.push(
-        <Anchor
-          key="project"
-          component={Link}
-          to={`/orgs/${orgId}/projects/${proj.id}`}
-          size="sm"
-        >
+        <Anchor key="project" component={Link} to={`/orgs/${orgId}/projects/${proj.id}`} size="sm">
           {proj.name}
-        </Anchor>,
+        </Anchor>
       );
     }
     items.push(
@@ -140,14 +130,14 @@ function buildBreadcrumbs(
         size="sm"
       >
         {subproject.name}
-      </Anchor>,
+      </Anchor>
     );
   }
 
   items.push(
     <Text key="campaign" size="sm">
       {campaign?.name ?? "…"}
-    </Text>,
+    </Text>
   );
 
   return items;

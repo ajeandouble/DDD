@@ -2,13 +2,31 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Stack, Title, Button, Group, Modal, TextInput, Textarea, Switch,
-  Badge, Text, Collapse, Code, Paper, Select, Loader, Alert,
+  Stack,
+  Title,
+  Button,
+  Group,
+  Modal,
+  TextInput,
+  Textarea,
+  Switch,
+  Badge,
+  Text,
+  Collapse,
+  Code,
+  Paper,
+  Select,
+  Loader,
+  Alert,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
-  listWebhookEndpoints, createWebhookEndpoint, deleteWebhookEndpoint,
-  updateWebhookEndpoint, listDeliveries, testTransformer,
+  listWebhookEndpoints,
+  createWebhookEndpoint,
+  deleteWebhookEndpoint,
+  updateWebhookEndpoint,
+  listDeliveries,
+  testTransformer,
 } from "../lib/api";
 import type { WebhookEndpoint, Delivery } from "../dto/webhooks";
 
@@ -50,7 +68,7 @@ const DEFAULT_SAMPLE_PAYLOAD = JSON.stringify(
     stats: { word_count: 11, duration_seconds: 5.16 },
   },
   null,
-  2,
+  2
 );
 
 const DEFAULT_TRANSFORMER = `# payload keys: event, conversation_id, org_id, title, conversation_timestamp,
@@ -85,10 +103,16 @@ export function WebhooksPage() {
     <Stack gap="lg">
       <Group justify="space-between">
         <Title order={3}>Webhooks</Title>
-        <Button size="xs" onClick={openCreate}>New endpoint</Button>
+        <Button size="xs" onClick={openCreate}>
+          New endpoint
+        </Button>
       </Group>
 
-      {endpoints?.length === 0 && <Text size="sm" c="dimmed">No endpoints yet.</Text>}
+      {endpoints?.length === 0 && (
+        <Text size="sm" c="dimmed">
+          No endpoints yet.
+        </Text>
+      )}
 
       {endpoints?.map((ep) => (
         <EndpointRow
@@ -100,15 +124,26 @@ export function WebhooksPage() {
         />
       ))}
 
-      <CreateModal orgId={orgId!} opened={createOpen} onClose={closeCreate} onCreated={invalidate} />
+      <CreateModal
+        orgId={orgId!}
+        opened={createOpen}
+        onClose={closeCreate}
+        onCreated={invalidate}
+      />
     </Stack>
   );
 }
 
 function EndpointRow({
-  ep, orgId, onDelete, onUpdate,
+  ep,
+  orgId,
+  onDelete,
+  onUpdate,
 }: {
-  ep: WebhookEndpoint; orgId: string; onDelete: () => void; onUpdate: () => void;
+  ep: WebhookEndpoint;
+  orgId: string;
+  onDelete: () => void;
+  onUpdate: () => void;
 }) {
   const [logsOpen, { toggle: toggleLogs }] = useDisclosure(false);
   const [editOpen, { open: openEdit, close: closeEdit }] = useDisclosure(false);
@@ -130,31 +165,47 @@ function EndpointRow({
       <Group justify="space-between" wrap="nowrap">
         <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
           <Group gap="xs">
-            <Text size="sm" fw={500} style={{ wordBreak: "break-all" }}>{ep.url}</Text>
+            <Text size="sm" fw={500} style={{ wordBreak: "break-all" }}>
+              {ep.url}
+            </Text>
             <Badge size="xs" color={ep.enabled ? "green" : "gray"} variant="dot">
               {ep.enabled ? "active" : "disabled"}
             </Badge>
             {ep.event_types.map((et) => (
-              <Badge key={et} size="xs" variant="outline">{et}</Badge>
+              <Badge key={et} size="xs" variant="outline">
+                {et}
+              </Badge>
             ))}
           </Group>
-          <Text size="xs" c="dimmed">{new Date(ep.created_at).toLocaleString()}</Text>
+          <Text size="xs" c="dimmed">
+            {new Date(ep.created_at).toLocaleString()}
+          </Text>
         </Stack>
         <Group gap={4} wrap="nowrap">
           <Button size="xs" variant="subtle" onClick={toggleLogs}>
             {logsOpen ? "Hide logs" : "Logs"}
           </Button>
-          <Button size="xs" variant="subtle" onClick={openEdit}>Edit</Button>
+          <Button size="xs" variant="subtle" onClick={openEdit}>
+            Edit
+          </Button>
           <Switch size="xs" checked={ep.enabled} onChange={() => toggleMutation.mutate()} />
-          <Button size="xs" variant="subtle" color="red" onClick={onDelete}>Delete</Button>
+          <Button size="xs" variant="subtle" color="red" onClick={onDelete}>
+            Delete
+          </Button>
         </Group>
       </Group>
 
       <Collapse expanded={logsOpen}>
         <Stack gap="xs" mt="sm">
           {!deliveries && <Loader size="xs" />}
-          {deliveries?.length === 0 && <Text size="xs" c="dimmed">No deliveries yet.</Text>}
-          {deliveries?.map((d) => <DeliveryRow key={d.id} d={d} />)}
+          {deliveries?.length === 0 && (
+            <Text size="xs" c="dimmed">
+              No deliveries yet.
+            </Text>
+          )}
+          {deliveries?.map((d) => (
+            <DeliveryRow key={d.id} d={d} />
+          ))}
         </Stack>
       </Collapse>
 
@@ -170,9 +221,17 @@ function DeliveryRow({ d }: { d: Delivery }) {
   return (
     <Stack gap={2}>
       <Group gap="xs" style={{ cursor: "pointer" }} onClick={toggle}>
-        <Badge size="xs" color={color}>{d.status}</Badge>
-        {d.response_code && <Text size="xs" c="dimmed">HTTP {d.response_code}</Text>}
-        <Text size="xs" c="dimmed">{new Date(d.created_at).toLocaleString()}</Text>
+        <Badge size="xs" color={color}>
+          {d.status}
+        </Badge>
+        {d.response_code && (
+          <Text size="xs" c="dimmed">
+            HTTP {d.response_code}
+          </Text>
+        )}
+        <Text size="xs" c="dimmed">
+          {new Date(d.created_at).toLocaleString()}
+        </Text>
       </Group>
       <Collapse expanded={open}>
         {d.error && (
@@ -198,7 +257,11 @@ function TransformerSection({
   onTransformerChange: (v: string) => void;
 }) {
   const [sampleRaw, setSampleRaw] = useState(DEFAULT_SAMPLE_PAYLOAD);
-  const [testResult, setTestResult] = useState<{ result: unknown; error: string | null; stdout: string } | null>(null);
+  const [testResult, setTestResult] = useState<{
+    result: unknown;
+    error: string | null;
+    stdout: string;
+  } | null>(null);
   const [testing, setTesting] = useState(false);
   const [payloadError, setPayloadError] = useState<string | null>(null);
 
@@ -222,7 +285,9 @@ function TransformerSection({
 
   return (
     <Stack gap={4}>
-      <Text size="sm" fw={500}>Transformer</Text>
+      <Text size="sm" fw={500}>
+        Transformer
+      </Text>
       <Text size="xs" c="dimmed">
         Receives <Code>payload</Code> dict. Assign a dict to <Code>result</Code>.
       </Text>
@@ -232,10 +297,15 @@ function TransformerSection({
         rows={8}
         styles={{ input: { fontFamily: "monospace", fontSize: 13 } }}
       />
-      <Text size="sm" fw={500} mt={4}>Sample payload</Text>
+      <Text size="sm" fw={500} mt={4}>
+        Sample payload
+      </Text>
       <Textarea
         value={sampleRaw}
-        onChange={(e) => { setSampleRaw(e.currentTarget.value); setPayloadError(null); }}
+        onChange={(e) => {
+          setSampleRaw(e.currentTarget.value);
+          setPayloadError(null);
+        }}
         rows={6}
         error={payloadError}
         styles={{ input: { fontFamily: "monospace", fontSize: 11 } }}
@@ -253,7 +323,10 @@ function TransformerSection({
             </Code>
           )}
           {testResult.error ? (
-            <Code block style={{ fontSize: 11, whiteSpace: "pre-wrap", color: "var(--mantine-color-red-6)" }}>
+            <Code
+              block
+              style={{ fontSize: 11, whiteSpace: "pre-wrap", color: "var(--mantine-color-red-6)" }}
+            >
               {testResult.error}
             </Code>
           ) : (
@@ -268,9 +341,15 @@ function TransformerSection({
 }
 
 function CreateModal({
-  orgId, opened, onClose, onCreated,
+  orgId,
+  opened,
+  onClose,
+  onCreated,
 }: {
-  orgId: string; opened: boolean; onClose: () => void; onCreated: () => void;
+  orgId: string;
+  opened: boolean;
+  onClose: () => void;
+  onCreated: () => void;
 }) {
   const [url, setUrl] = useState("");
   const [secret, setSecret] = useState("");
@@ -279,21 +358,48 @@ function CreateModal({
   const mutation = useMutation({
     mutationFn: () =>
       createWebhookEndpoint(orgId, {
-        url, secret, event_types: ["conversation.transcribed"], transformer, enabled: true,
+        url,
+        secret,
+        event_types: ["conversation.transcribed"],
+        transformer,
+        enabled: true,
       }),
-    onSuccess: () => { onCreated(); onClose(); setUrl(""); setSecret(""); setTransformer(DEFAULT_TRANSFORMER); },
+    onSuccess: () => {
+      onCreated();
+      onClose();
+      setUrl("");
+      setSecret("");
+      setTransformer(DEFAULT_TRANSFORMER);
+    },
   });
 
   return (
     <Modal opened={opened} onClose={onClose} title="New webhook endpoint" size="lg" centered>
       <Stack>
-        <TextInput label="URL" placeholder="http://localhost:4000" value={url} onChange={(e) => setUrl(e.currentTarget.value)} />
-        <TextInput label="Secret (for HMAC signature)" placeholder="optional" value={secret} onChange={(e) => setSecret(e.currentTarget.value)} />
-        <Select label="Event" data={[{ value: "conversation.transcribed", label: "conversation.transcribed" }]} value="conversation.transcribed" readOnly />
+        <TextInput
+          label="URL"
+          placeholder="http://localhost:4000"
+          value={url}
+          onChange={(e) => setUrl(e.currentTarget.value)}
+        />
+        <TextInput
+          label="Secret (for HMAC signature)"
+          placeholder="optional"
+          value={secret}
+          onChange={(e) => setSecret(e.currentTarget.value)}
+        />
+        <Select
+          label="Event"
+          data={[{ value: "conversation.transcribed", label: "conversation.transcribed" }]}
+          value="conversation.transcribed"
+          readOnly
+        />
         <TransformerSection transformer={transformer} onTransformerChange={setTransformer} />
         {mutation.isError && <Alert color="red">{String(mutation.error)}</Alert>}
         <Group justify="flex-end">
-          <Button variant="default" onClick={onClose}>Cancel</Button>
+          <Button variant="default" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={!url}>
             Create
           </Button>
@@ -304,9 +410,17 @@ function CreateModal({
 }
 
 function EditModal({
-  orgId, ep, opened, onClose, onSaved,
+  orgId,
+  ep,
+  opened,
+  onClose,
+  onSaved,
 }: {
-  orgId: string; ep: WebhookEndpoint; opened: boolean; onClose: () => void; onSaved: () => void;
+  orgId: string;
+  ep: WebhookEndpoint;
+  opened: boolean;
+  onClose: () => void;
+  onSaved: () => void;
 }) {
   const [url, setUrl] = useState(ep.url);
   const [secret, setSecret] = useState(ep.secret);
@@ -314,18 +428,29 @@ function EditModal({
 
   const mutation = useMutation({
     mutationFn: () => updateWebhookEndpoint(orgId, ep.id, { url, secret, transformer }),
-    onSuccess: () => { onSaved(); onClose(); },
+    onSuccess: () => {
+      onSaved();
+      onClose();
+    },
   });
 
   return (
     <Modal opened={opened} onClose={onClose} title="Edit endpoint" size="lg" centered>
       <Stack>
         <TextInput label="URL" value={url} onChange={(e) => setUrl(e.currentTarget.value)} />
-        <TextInput label="Secret" value={secret} onChange={(e) => setSecret(e.currentTarget.value)} />
+        <TextInput
+          label="Secret"
+          value={secret}
+          onChange={(e) => setSecret(e.currentTarget.value)}
+        />
         <TransformerSection transformer={transformer} onTransformerChange={setTransformer} />
         <Group justify="flex-end">
-          <Button variant="default" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => mutation.mutate()} loading={mutation.isPending}>Save</Button>
+          <Button variant="default" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => mutation.mutate()} loading={mutation.isPending}>
+            Save
+          </Button>
         </Group>
       </Stack>
     </Modal>

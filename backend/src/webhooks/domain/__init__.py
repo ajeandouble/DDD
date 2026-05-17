@@ -22,7 +22,9 @@ class WebhookEndpoint:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
-    def create(cls, org_id: UUID, url: str, secret: str = "", transformer: str = "result = payload") -> "WebhookEndpoint":
+    def create(
+        cls, org_id: UUID, url: str, secret: str = "", transformer: str = "result = payload"
+    ) -> "WebhookEndpoint":
         return cls(org_id=org_id, url=url, secret=secret, transformer=transformer)
 
 

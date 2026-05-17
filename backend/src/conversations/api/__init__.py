@@ -1,9 +1,9 @@
-import json
+from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
 from src.conversations.application.commands import (
     ConversationCommandHandler,
@@ -12,7 +12,7 @@ from src.conversations.application.commands import (
     UpdateConversationCommand,
 )
 from src.conversations.application.queries import ConversationQueryHandler
-from src.conversations.domain.models import Conversation, ScopeType
+from src.conversations.domain.models import Conversation, ConversationType, ScopeType
 from src.conversations.domain.repositories import ConversationFilter, ConversationRepository
 from src.conversations.infrastructure.repositories import MongoConversationRepository
 from src.iam.application.authorization_service import AuthorizationService
@@ -55,9 +55,10 @@ class StatsResponse(BaseModel):
 
 class ConversationCreate(BaseModel):
     title: str
-    content: str
+    content: str | list[dict] = ""
+    type: ConversationType = "review"
+    conversation_timestamp: datetime | None = None
     metadata: list[MetadataEntry] = []
-    emit_webhook: bool = False
     organization_id: UUID | None = None
     scope_id: UUID
     scope_type: Literal["campaign"] = "campaign"
@@ -66,18 +67,18 @@ class ConversationCreate(BaseModel):
 
 class ConversationUpdate(BaseModel):
     title: str | None = None
-    content: str | None = None
+    content: str | list[dict] | None = None
     metadata: list[MetadataEntry] | None = None
-    emit_webhook: bool | None = None
 
 
 class ConversationResponse(BaseModel):
     id: UUID
     title: str
-    content: Any  # str for plain text; list[{speaker, text}] for transcripts
-    timestamp: str
+    content: Any
+    type: ConversationType
+    conversation_timestamp: str
+    created_at: str
     metadata: list[MetadataEntry]
-    emit_webhook: bool
     created_by: UUID
     organization_id: UUID | None
     scope_id: UUID | None
@@ -97,7 +98,7 @@ class SearchBody(BaseModel):
     filters: list[FilterInput] = []
     page: int = 1
     page_size: int = 20
-    sort_by: str = "timestamp"
+    sort_by: str = "conversation_timestamp"
     sort_dir: int = -1  # -1 = desc, 1 = asc
 
 
@@ -108,23 +109,15 @@ class PagedConversations(BaseModel):
     page_size: int
 
 
-def _parse_content(raw: str) -> Any:
-    if raw.startswith("["):
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            pass
-    return raw
-
-
 def _to_response(c: Conversation) -> ConversationResponse:
     return ConversationResponse(
         id=c.id,
         title=c.title,
-        content=_parse_content(c.content),
-        timestamp=c.timestamp.isoformat(),
+        content=c.content,
+        type=c.type,
+        conversation_timestamp=c.conversation_timestamp.isoformat(),
+        created_at=c.created_at.isoformat(),
         metadata=[MetadataEntry(key=k, value=v) for k, v in c.metadata],
-        emit_webhook=c.emit_webhook,
         created_by=c.created_by,
         organization_id=c.organization_id,
         scope_id=c.scope_id,
@@ -237,13 +230,17 @@ async def create_conversation(
     principal: Principal = Depends(get_current_principal),
 ):
     owner_id = principal.id if isinstance(principal, User) else principal.owner_id
+    ts = body.conversation_timestamp
+    if ts is not None and ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
     c = await commands.create(
         CreateConversationCommand(
             title=body.title,
             content=body.content,
+            type=body.type,
             created_by=owner_id,
+            conversation_timestamp=ts,
             metadata=[(e.key, e.value) for e in body.metadata],
-            emit_webhook=body.emit_webhook,
             organization_id=body.organization_id,
             scope_id=body.scope_id,
             scope_type=body.scope_type,
@@ -275,7 +272,6 @@ async def update_conversation(
                 metadata=(
                     [(e.key, e.value) for e in body.metadata] if body.metadata is not None else None
                 ),
-                emit_webhook=body.emit_webhook,
             )
         )
     except ConversationNotFound:

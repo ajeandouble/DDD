@@ -2,7 +2,13 @@ from uuid import UUID
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from src.analyzer.domain import AnalysisJob, JobStatus, Transcript, TranscriptSegment, TranscriptWord
+from src.analyzer.domain import (
+    AnalysisJob,
+    JobStatus,
+    Transcript,
+    TranscriptSegment,
+    TranscriptWord,
+)
 
 
 def _to_doc(job: AnalysisJob) -> dict:
@@ -28,7 +34,12 @@ def _to_doc(job: AnalysisJob) -> dict:
                     "end": s.end,
                     "text": s.text,
                     "words": [
-                        {"start": w.start, "end": w.end, "word": w.word, "probability": w.probability}
+                        {
+                            "start": w.start,
+                            "end": w.end,
+                            "word": w.word,
+                            "probability": w.probability,
+                        }
                         for w in s.words
                     ],
                 }

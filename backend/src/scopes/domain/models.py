@@ -71,4 +71,6 @@ class Campaign:
         parent_id: UUID,
         organization_id: UUID,
     ) -> "Campaign":
-        return cls(name=name, parent_type=parent_type, parent_id=parent_id, organization_id=organization_id)
+        return cls(
+            name=name, parent_type=parent_type, parent_id=parent_id, organization_id=organization_id
+        )

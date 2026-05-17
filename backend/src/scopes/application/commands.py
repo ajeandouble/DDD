@@ -76,6 +76,7 @@ class CreateProjectCommand:
     name: str
     organization_id: UUID
     requesting_user_id: UUID
+    bypass_membership: bool = False
 
 
 class ProjectCommandHandler:
@@ -87,7 +88,7 @@ class ProjectCommandHandler:
         org = await self._org_repo.find_by_id(cmd.organization_id)
         if org is None:
             raise ScopeNotFound(cmd.organization_id)
-        if not org.is_member(cmd.requesting_user_id):
+        if not cmd.bypass_membership and not org.is_member(cmd.requesting_user_id):
             raise NotAMember(cmd.requesting_user_id)
         project = Project.create(name=cmd.name, organization_id=cmd.organization_id)
         await self._repo.save(project)
@@ -110,6 +111,7 @@ class CreateSubprojectCommand:
     project_id: UUID
     org_id: UUID
     requesting_user_id: UUID
+    bypass_membership: bool = False
 
 
 class SubprojectCommandHandler:
@@ -127,7 +129,7 @@ class SubprojectCommandHandler:
         org = await self._org_repo.find_by_id(cmd.org_id)
         if org is None:
             raise ScopeNotFound(cmd.org_id)
-        if not org.is_member(cmd.requesting_user_id):
+        if not cmd.bypass_membership and not org.is_member(cmd.requesting_user_id):
             raise NotAMember(cmd.requesting_user_id)
         project = await self._project_repo.find_by_id(cmd.project_id)
         if project is None:
@@ -154,6 +156,7 @@ class CreateCampaignCommand:
     parent_id: UUID
     org_id: UUID
     requesting_user_id: UUID
+    bypass_membership: bool = False
 
 
 class CampaignCommandHandler:
@@ -169,7 +172,7 @@ class CampaignCommandHandler:
         org = await self._org_repo.find_by_id(cmd.org_id)
         if org is None:
             raise ScopeNotFound(cmd.org_id)
-        if not org.is_member(cmd.requesting_user_id):
+        if not cmd.bypass_membership and not org.is_member(cmd.requesting_user_id):
             raise NotAMember(cmd.requesting_user_id)
         campaign = Campaign.create(
             name=cmd.name,

@@ -2,7 +2,6 @@ import os
 import shutil
 from uuid import uuid4
 
-
 STORAGE_DIR = os.environ.get("STORAGE_DIR", "/tmp/ddd_storage")
 
 

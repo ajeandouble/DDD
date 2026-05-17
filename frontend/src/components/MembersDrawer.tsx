@@ -72,7 +72,11 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
 
   const rolesKey = ["roles", orgId, scopeType, scopeId];
 
-  const { data: roles, isLoading: rolesLoading, error: rolesError } = useQuery({
+  const {
+    data: roles,
+    isLoading: rolesLoading,
+    error: rolesError,
+  } = useQuery({
     queryKey: rolesKey,
     queryFn: () => listRoles(orgId, { scope_type: scopeType, scope_id: scopeId }),
     enabled: opened,
@@ -106,11 +110,16 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
 
   const effectiveRoleAtScope = (() => {
     switch (scopeType) {
-      case "org": return myRoles?.org;
-      case "project": return myRoles?.projects?.[scopeId];
-      case "subproject": return myRoles?.subprojects?.[scopeId];
-      case "campaign": return myRoles?.campaigns?.[scopeId];
-      default: return null;
+      case "org":
+        return myRoles?.org;
+      case "project":
+        return myRoles?.projects?.[scopeId];
+      case "subproject":
+        return myRoles?.subprojects?.[scopeId];
+      case "campaign":
+        return myRoles?.campaigns?.[scopeId];
+      default:
+        return null;
     }
   })();
 
@@ -180,7 +189,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
 
   const selectedAssignments = useMemo(
     () => (roles ?? []).filter((_, i) => selected.has(i)),
-    [roles, selected],
+    [roles, selected]
   );
 
   const bulkRevokeMutation = useMutation({
@@ -268,8 +277,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
     .map((a, i) => (a.subject !== `user:${me?.id}` ? i : -1))
     .filter((i) => i >= 0);
   const allSelected =
-    allSelectableIndices.length > 0 &&
-    allSelectableIndices.every((i) => selected.has(i));
+    allSelectableIndices.length > 0 && allSelectableIndices.every((i) => selected.has(i));
 
   const rolesContent = (
     <Stack gap="sm">
@@ -295,7 +303,11 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                 setSelected(new Set(allSelectableIndices));
               }
             }}
-            label={<Text size="xs" c="dimmed">Select all</Text>}
+            label={
+              <Text size="xs" c="dimmed">
+                Select all
+              </Text>
+            }
           />
         </Group>
       )}
@@ -304,7 +316,9 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
       {canAssignRoles && selected.size > 0 && (
         <Paper withBorder p="xs" radius="sm">
           <Group gap="xs" wrap="wrap">
-            <Text size="xs" c="dimmed">{selected.size} selected</Text>
+            <Text size="xs" c="dimmed">
+              {selected.size} selected
+            </Text>
             <Button
               size="compact-xs"
               color="red"
@@ -392,59 +406,61 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
 
       <Divider mt="xs" />
 
-      {canAssignRoles && <>
-      <Text size="sm" fw={600}>
-        Assign role
-      </Text>
-      {showGroups && (
-        <SegmentedControl
-          size="xs"
-          value={subjectType}
-          onChange={(v) => setSubjectType(v as "user" | "group")}
-          data={[
-            { label: "User", value: "user" },
-            { label: "Group", value: "group" },
-          ]}
-        />
+      {canAssignRoles && (
+        <>
+          <Text size="sm" fw={600}>
+            Assign role
+          </Text>
+          {showGroups && (
+            <SegmentedControl
+              size="xs"
+              value={subjectType}
+              onChange={(v) => setSubjectType(v as "user" | "group")}
+              data={[
+                { label: "User", value: "user" },
+                { label: "Group", value: "group" },
+              ]}
+            />
+          )}
+          {subjectType === "user" ? (
+            <Autocomplete
+              placeholder="user@example.com"
+              data={users?.filter((u) => u.id !== me?.id).map((u) => u.email) ?? []}
+              value={email}
+              onChange={setEmail}
+              size="xs"
+            />
+          ) : (
+            <Select
+              placeholder="Select group"
+              data={groups?.map((g) => ({ value: g.id, label: g.name })) ?? []}
+              value={groupSubject}
+              onChange={setGroupSubject}
+              size="xs"
+            />
+          )}
+          <Select
+            placeholder="Role"
+            data={ROLE_OPTIONS}
+            value={role}
+            onChange={setRole}
+            size="xs"
+          />
+          {assignMutation.isError && (
+            <Text size="xs" c="red">
+              {String(assignMutation.error)}
+            </Text>
+          )}
+          <Button
+            size="xs"
+            onClick={() => assignMutation.mutate()}
+            loading={assignMutation.isPending}
+            disabled={(!email && !groupSubject) || !role}
+          >
+            Assign
+          </Button>
+        </>
       )}
-      {subjectType === "user" ? (
-        <Autocomplete
-          placeholder="user@example.com"
-          data={users?.filter((u) => u.id !== me?.id).map((u) => u.email) ?? []}
-          value={email}
-          onChange={setEmail}
-          size="xs"
-        />
-      ) : (
-        <Select
-          placeholder="Select group"
-          data={groups?.map((g) => ({ value: g.id, label: g.name })) ?? []}
-          value={groupSubject}
-          onChange={setGroupSubject}
-          size="xs"
-        />
-      )}
-      <Select
-        placeholder="Role"
-        data={ROLE_OPTIONS}
-        value={role}
-        onChange={setRole}
-        size="xs"
-      />
-      {assignMutation.isError && (
-        <Text size="xs" c="red">
-          {String(assignMutation.error)}
-        </Text>
-      )}
-      <Button
-        size="xs"
-        onClick={() => assignMutation.mutate()}
-        loading={assignMutation.isPending}
-        disabled={(!email && !groupSubject) || !role}
-      >
-        Assign
-      </Button>
-      </>}
     </Stack>
   );
 
@@ -487,13 +503,19 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                           [g.id]: allSelected ? new Set() : new Set(g.member_ids),
                         }));
                       }}
-                      label={<Text size="xs" c="dimmed">Select all</Text>}
+                      label={
+                        <Text size="xs" c="dimmed">
+                          Select all
+                        </Text>
+                      }
                     />
                   </Group>
                 )}
                 {canManageGroup(g) && (groupMemberSelected[g.id]?.size ?? 0) > 0 && (
                   <Group gap="xs">
-                    <Text size="xs" c="dimmed">{groupMemberSelected[g.id]?.size} selected</Text>
+                    <Text size="xs" c="dimmed">
+                      {groupMemberSelected[g.id]?.size} selected
+                    </Text>
                     <Button
                       size="compact-xs"
                       color="red"
@@ -513,7 +535,12 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                 {g.member_ids.map((mid) => {
                   const isSelf = mid === me?.id;
                   return (
-                    <Group key={mid} justify="space-between" wrap="nowrap" opacity={isSelf ? 0.5 : 1}>
+                    <Group
+                      key={mid}
+                      justify="space-between"
+                      wrap="nowrap"
+                      opacity={isSelf ? 0.5 : 1}
+                    >
                       <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
                         {canManageGroup(g) && (
                           <Checkbox
@@ -531,7 +558,10 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                         <Text size="xs" truncate>
                           {userById[mid] ?? mid}
                           {isSelf && (
-                            <Text component="span" size="xs" c="dimmed"> (you)</Text>
+                            <Text component="span" size="xs" c="dimmed">
+                              {" "}
+                              (you)
+                            </Text>
                           )}
                         </Text>
                       </Group>
@@ -558,9 +588,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                         placeholder="Add by email"
                         data={users?.map((u) => u.email) ?? []}
                         value={groupMemberEmail[g.id] ?? ""}
-                        onChange={(v) =>
-                          setGroupMemberEmail((prev) => ({ ...prev, [g.id]: v }))
-                        }
+                        onChange={(v) => setGroupMemberEmail((prev) => ({ ...prev, [g.id]: v }))}
                         size="xs"
                         style={{ flex: 1 }}
                       />

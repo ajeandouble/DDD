@@ -78,9 +78,9 @@ class MongoWebhookEndpointRepository:
         return [_ep_from_doc(d) for d in docs]
 
     async def find_enabled_for_event(self, event_type: str) -> list[WebhookEndpoint]:
-        docs = await self._col.find(
-            {"enabled": True, "event_types": event_type}
-        ).to_list(length=200)
+        docs = await self._col.find({"enabled": True, "event_types": event_type}).to_list(
+            length=200
+        )
         return [_ep_from_doc(d) for d in docs]
 
     async def delete(self, ep_id: UUID) -> None:
@@ -95,7 +95,9 @@ class MongoDeliveryRepository:
         await self._col.insert_one(_del_to_doc(d))
 
     async def find_by_endpoint(self, endpoint_id: UUID, limit: int = 50) -> list[Delivery]:
-        docs = await self._col.find({"endpoint_id": endpoint_id}).sort(
-            "created_at", -1
-        ).to_list(length=limit)
+        docs = (
+            await self._col.find({"endpoint_id": endpoint_id})
+            .sort("created_at", -1)
+            .to_list(length=limit)
+        )
         return [_del_from_doc(d) for d in docs]

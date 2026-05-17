@@ -1,7 +1,11 @@
 from uuid import UUID
 
 from src.conversations.domain.models import Conversation, ScopeType
-from src.conversations.domain.repositories import ConversationFilter, ConversationRepository, PagedResult
+from src.conversations.domain.repositories import (
+    ConversationFilter,
+    ConversationRepository,
+    PagedResult,
+)
 
 
 class ConversationQueryHandler:

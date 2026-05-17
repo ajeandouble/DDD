@@ -14,7 +14,9 @@ from src.iam.api.authz import router as authz_router
 from src.iam.application.event_handlers import register_handlers as register_iam_handlers
 from src.scopes.application.event_handlers import register_handlers as register_scopes_handlers
 from src.analyzer.application.event_handlers import register_handlers as register_analyzer_handlers
-from src.conversations.application.event_handlers import register_handlers as register_conversation_handlers
+from src.conversations.application.event_handlers import (
+    register_handlers as register_conversation_handlers,
+)
 from src.iam.infrastructure.enforcer import init_enforcer
 from src.conversations.api import router as conversations_router
 from src.imports.api import router as imports_router

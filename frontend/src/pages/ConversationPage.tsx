@@ -34,7 +34,9 @@ export function ConversationPage() {
     refetchInterval: (query) => {
       const c = query.state.data;
       if (!c) return 3000;
-      return c.type === "conversation" && Array.isArray(c.content) && c.content.length === 0 ? 3000 : false;
+      return c.type === "conversation" && Array.isArray(c.content) && c.content.length === 0
+        ? 3000
+        : false;
     },
     retry: false,
   });
@@ -51,9 +53,10 @@ export function ConversationPage() {
 
   const storageKey = importJobs?.find((j) => j.storage_key)?.storage_key ?? null;
   const audioUrl = storageKey ? `/api/storage/${storageKey}` : null;
-  const turns = conv.type === "conversation" && Array.isArray(conv.content) && conv.content.length > 0
-    ? (conv.content as SpeakerTurn[])
-    : null;
+  const turns =
+    conv.type === "conversation" && Array.isArray(conv.content) && conv.content.length > 0
+      ? (conv.content as SpeakerTurn[])
+      : null;
   const isTranscribing = !!storageKey && conv.type === "conversation" && !turns;
 
   return (
@@ -99,7 +102,9 @@ export function ConversationPage() {
       ) : turns ? (
         // Transcript without audio (text-only turns)
         <Stack gap="md">
-          <Text size="sm" c="dimmed" fw={600}>TRANSCRIPT</Text>
+          <Text size="sm" c="dimmed" fw={600}>
+            TRANSCRIPT
+          </Text>
           {turns.map((t, i) => (
             <Paper key={i} withBorder p="sm" radius="sm">
               <Text size="xs" fw={700} c={i % 2 === 0 ? "blue" : "violet"} mb={4}>
@@ -110,13 +115,19 @@ export function ConversationPage() {
           ))}
         </Stack>
       ) : isTranscribing ? (
-        <Text size="sm" c="dimmed">Transcription in progress…</Text>
+        <Text size="sm" c="dimmed">
+          Transcription in progress…
+        </Text>
       ) : typeof conv.content === "string" && conv.content ? (
         <Paper withBorder p="md" radius="sm">
-          <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>{conv.content}</Text>
+          <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+            {conv.content}
+          </Text>
         </Paper>
       ) : (
-        <Text size="sm" c="dimmed">No content yet.</Text>
+        <Text size="sm" c="dimmed">
+          No content yet.
+        </Text>
       )}
     </Stack>
   );
