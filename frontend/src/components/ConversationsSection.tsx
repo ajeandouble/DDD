@@ -34,7 +34,7 @@ import {
   getImportJobs,
 } from "../lib/api";
 import type { ConvFilter, FilterField, FilterOp } from "../lib/api";
-import type { ConversationResponse, ScopeType } from "../dto/conversations";
+import type { ConversationResponse } from "../dto/conversations";
 
 type MetaRow = { key: string; value: string };
 
@@ -250,8 +250,8 @@ function SpeakerTurnsEditor({
 
 interface Props {
   organizationId: string;
-  scopeId?: string;
-  scopeType?: ScopeType;
+  scopeId: string;
+  scopeType?: "campaign";
   queryKey: string[];
 }
 
@@ -267,7 +267,9 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
   const [metadata, setMetadata] = useState<MetaRow[]>([]);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
+  const [conversationTs, setConversationTs] = useState("");
   const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadConversationTs, setUploadConversationTs] = useState("");
   const [uploadMetadata, setUploadMetadata] = useState<MetaRow[]>([]);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -280,7 +282,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
   const [filtersOpen, { toggle: toggleFilters }] = useDisclosure(false);
   const [activeFilters, setActiveFilters] = useState<ConvFilter[]>([]);
   const [draftFilters, setDraftFilters] = useState<ConvFilter[]>([]);
-  const [sortBy, setSortBy] = useState("timestamp");
+  const [sortBy, setSortBy] = useState("conversation_timestamp");
   const [sortDir, setSortDir] = useState(-1);
 
   const toggleSort = (field: string) => {
@@ -289,8 +291,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
     setPage(1);
   };
 
-  // A conversation is "pending transcript" if it has non-array content and was created < 2h ago.
-  const TWO_HOURS = 2 * 60 * 60 * 1_000;
+  // A conversation is "pending transcript" if type="conversation" but content is empty (awaiting transcription).
   const [hasPending, setHasPending] = useState(false);
   const refetchInterval = useBackoffInterval(hasPending);
 
@@ -307,9 +308,8 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
 
   useEffect(() => {
     if (!data) return;
-    const now = Date.now();
     const pending = data.items.some(
-      (c) => !Array.isArray(c.content) && now - new Date(c.timestamp).getTime() < TWO_HOURS,
+      (c) => c.type === "conversation" && Array.isArray(c.content) && c.content.length === 0,
     );
     setHasPending(pending);
   }, [dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -319,17 +319,19 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
 
   const createMutation = useMutation({
     mutationFn: () => {
-      const serializedContent =
-        contentMode === "turns"
-          ? JSON.stringify(turns.map((t) => ({ speaker: t.speaker, text: t.text, words: [] })))
-          : content;
+      const isConversation = contentMode === "turns";
+      const structuredContent = isConversation
+        ? turns.map((t) => ({ speaker: t.speaker, text: t.text, words: [] }))
+        : content;
       return createConversation({
         title,
-        content: serializedContent,
+        content: structuredContent,
+        type: isConversation ? "conversation" : "review",
+        conversation_timestamp: conversationTs ? new Date(conversationTs).toISOString() : undefined,
         metadata: metadata.filter((m) => m.key.trim()),
         organization_id: organizationId,
         scope_id: scopeId,
-        scope_type: scopeType ?? undefined,
+        scope_type: "campaign",
       });
     },
     onSuccess: () => {
@@ -340,6 +342,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
       setTurns([{ speaker: "Speaker A", text: "" }]);
       setMetadata([]);
       setContentMode("text");
+      setConversationTs("");
     },
   });
 
@@ -348,11 +351,13 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
       if (!audioFile) throw new Error("No file selected");
       const conv = await createConversation({
         title: uploadTitle || audioFile.name,
-        content: "",
+        content: [],
+        type: "conversation",
+        conversation_timestamp: uploadConversationTs ? new Date(uploadConversationTs).toISOString() : undefined,
         metadata: uploadMetadata.filter((m) => m.key.trim()),
         organization_id: organizationId,
         scope_id: scopeId,
-        scope_type: scopeType ?? undefined,
+        scope_type: "campaign",
       });
       await uploadAudio(conv.id, audioFile);
     },
@@ -360,6 +365,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
       invalidate();
       closeUpload();
       setUploadTitle("");
+      setUploadConversationTs("");
       setUploadMetadata([]);
       setAudioFile(null);
     },
@@ -428,6 +434,16 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
               <SpeakerTurnsEditor value={turns} onChange={setTurns} />
             )}
           </Stack>
+          <Stack gap={4}>
+            <Text size="sm" fw={500}>Date &amp; time (UTC)</Text>
+            <input
+              type="datetime-local"
+              value={conversationTs}
+              onChange={(e) => setConversationTs(e.currentTarget.value)}
+              style={{ width: "100%", padding: "6px 8px", borderRadius: 4, border: "1px solid #ced4da", fontSize: 14 }}
+            />
+            <Text size="xs" c="dimmed">Leave blank to use current time</Text>
+          </Stack>
           <MetadataEditor value={metadata} onChange={setMetadata} />
           {createMutation.isError && (
             <Text size="sm" c="red">
@@ -481,6 +497,16 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
                 </Text>
               )}
             </Group>
+          </Stack>
+          <Stack gap={4}>
+            <Text size="sm" fw={500}>Date &amp; time (UTC)</Text>
+            <input
+              type="datetime-local"
+              value={uploadConversationTs}
+              onChange={(e) => setUploadConversationTs(e.currentTarget.value)}
+              style={{ width: "100%", padding: "6px 8px", borderRadius: 4, border: "1px solid #ced4da", fontSize: 14 }}
+            />
+            <Text size="xs" c="dimmed">Leave blank to use current time</Text>
           </Stack>
           <MetadataEditor value={uploadMetadata} onChange={setUploadMetadata} />
           {uploadMutation.isPending && <Progress animated value={100} size="xs" />}
@@ -545,8 +571,8 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
         <Group justify="space-between">
           <Group gap={6}>
             <Text fw={600} size="sm" c="dimmed">CONVERSATIONS</Text>
-            {(["timestamp", "title", "stats.duration_seconds"] as const).map((field) => {
-              const labels: Record<string, string> = { timestamp: "Date", title: "Title", "stats.duration_seconds": "Duration" };
+            {(["conversation_timestamp", "title", "stats.duration_seconds"] as const).map((field) => {
+              const labels: Record<string, string> = { conversation_timestamp: "Date", title: "Title", "stats.duration_seconds": "Duration" };
               const active = sortBy === field;
               return (
                 <Button
@@ -639,10 +665,10 @@ function ConversationCard({
   });
 
   const hasAudio = (importJobs?.length ?? 0) > 0;
-  const hasTranscript = Array.isArray(conv.content);
+  const hasTranscript = conv.type === "conversation" && Array.isArray(conv.content) && conv.content.length > 0;
   const isTranscribing = hasAudio && !hasTranscript;
 
-  const ts = new Date(conv.timestamp);
+  const ts = new Date(conv.conversation_timestamp);
   const dateStr = ts.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   const timeStr = ts.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
@@ -676,7 +702,7 @@ function ConversationCard({
               <Badge size="xs" color="teal" variant="dot">transcript</Badge>
             )}
           </Group>
-          {typeof conv.content === "string" && conv.content && !hasTranscript && (
+          {conv.type === "review" && typeof conv.content === "string" && conv.content && (
             <Text size="xs" c="dimmed" lineClamp={2}>{conv.content}</Text>
           )}
           {conv.stats.duration_seconds != null && (

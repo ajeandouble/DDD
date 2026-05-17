@@ -31,9 +31,10 @@ export const ConversationResponse = z.object({
   id: z.string().uuid(),
   title: z.string(),
   content: z.union([z.string(), z.array(SpeakerTurn)]),
-  timestamp: z.string(),
+  type: z.enum(["review", "conversation"]),
+  conversation_timestamp: z.string(),
+  created_at: z.string(),
   metadata: z.array(MetadataEntry),
-  emit_webhook: z.boolean(),
   created_by: z.string().uuid(),
   organization_id: z.string().uuid().nullable(),
   scope_id: z.string().uuid().nullable(),
@@ -44,9 +45,10 @@ export const ConversationResponse = z.object({
 
 export const ConversationCreateRequest = z.object({
   title: z.string().min(1),
-  content: z.string(),
+  content: z.union([z.string(), z.array(z.object({ speaker: z.string(), text: z.string(), words: z.array(z.object({ word: z.string(), start: z.number(), end: z.number() })).optional() }))]),
+  type: z.enum(["review", "conversation"]).default("review"),
+  conversation_timestamp: z.string().optional(),
   metadata: z.array(MetadataEntry).default([]),
-  emit_webhook: z.boolean().default(false),
   organization_id: z.string().uuid().nullable().optional(),
   scope_id: z.string().uuid().nullable().optional(),
   scope_type: ScopeType.optional(),
@@ -56,7 +58,6 @@ export const ConversationUpdateRequest = z.object({
   title: z.string().min(1).optional(),
   content: z.string().optional(),
   metadata: z.array(MetadataEntry).optional(),
-  emit_webhook: z.boolean().optional(),
 });
 
 export type MetadataEntry = z.infer<typeof MetadataEntry>;

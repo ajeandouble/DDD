@@ -18,7 +18,7 @@ export function HomePage() {
       <ul>
         {data?.map((c) => (
           <li key={c.id}>
-            <strong>{c.title}</strong> — {c.timestamp}
+            <strong>{c.title}</strong> — {c.conversation_timestamp}
           </li>
         ))}
       </ul>

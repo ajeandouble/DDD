@@ -16,6 +16,7 @@ export const IamGroupSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   org_id: z.string().uuid(),
+  owner_id: z.string().uuid(),
   member_ids: z.array(z.string().uuid()),
   created_at: z.string(),
 });

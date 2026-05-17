@@ -105,14 +105,6 @@ export function AppLayout() {
           <Divider my={4} />
           <NavLink
             component={Link}
-            to="/orgs"
-            label="Manage organizations"
-            onClick={closeNavbar}
-            c="dimmed"
-            styles={{ label: { fontSize: "var(--mantine-font-size-xs)" } }}
-          />
-          <NavLink
-            component={Link}
             to="/settings"
             label="Settings"
             onClick={closeNavbar}

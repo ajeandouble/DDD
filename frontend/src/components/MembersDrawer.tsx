@@ -30,6 +30,7 @@ import {
   addGroupMember,
   removeGroupMember,
   getMe,
+  getMyRoles,
 } from "../lib/api";
 import type { RoleAssignment } from "../dto/iam";
 
@@ -94,6 +95,29 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
     queryFn: () => listGroups(orgId),
     enabled: opened && !!showGroups,
   });
+
+  const { data: myRoles } = useQuery({
+    queryKey: ["my-roles", orgId],
+    queryFn: () => getMyRoles(orgId),
+    enabled: opened,
+  });
+
+  const MANAGE_ROLES = new Set(["supervisor", "admin"]);
+
+  const effectiveRoleAtScope = (() => {
+    switch (scopeType) {
+      case "org": return myRoles?.org;
+      case "project": return myRoles?.projects?.[scopeId];
+      case "subproject": return myRoles?.subprojects?.[scopeId];
+      case "campaign": return myRoles?.campaigns?.[scopeId];
+      default: return null;
+    }
+  })();
+
+  const canAssignRoles = !!effectiveRoleAtScope && MANAGE_ROLES.has(effectiveRoleAtScope);
+  const canManageOrgGroups = !!myRoles?.org && MANAGE_ROLES.has(myRoles.org);
+  const canCreateGroup = canAssignRoles;
+  const canManageGroup = (g: { owner_id: string }) => canManageOrgGroups || g.owner_id === me?.id;
 
   const userById = Object.fromEntries(users?.map((u) => [u.id, u.email]) ?? []);
   const groupById = Object.fromEntries(groups?.map((g) => [g.id, g.name]) ?? []);
@@ -201,7 +225,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
   });
 
   const createGroupMutation = useMutation({
-    mutationFn: () => createGroup(orgId, groupName),
+    mutationFn: () => createGroup(orgId, groupName, scopeType, scopeId),
     onSuccess: () => {
       invalidateGroups();
       setGroupName("");
@@ -258,7 +282,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
       )}
 
       {/* Select-all row */}
-      {(roles?.length ?? 0) > 1 && (
+      {canAssignRoles && (roles?.length ?? 0) > 1 && (
         <Group gap="xs">
           <Checkbox
             size="xs"
@@ -277,7 +301,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
       )}
 
       {/* Bulk action bar */}
-      {selected.size > 0 && (
+      {canAssignRoles && selected.size > 0 && (
         <Paper withBorder p="xs" radius="sm">
           <Group gap="xs" wrap="wrap">
             <Text size="xs" c="dimmed">{selected.size} selected</Text>
@@ -315,17 +339,19 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
         return (
           <Group key={i} justify="space-between" wrap="nowrap" opacity={isSelf ? 0.5 : 1}>
             <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
-              <Checkbox
-                size="xs"
-                disabled={isSelf}
-                checked={selected.has(i)}
-                onChange={() => {
-                  const next = new Set(selected);
-                  if (next.has(i)) next.delete(i);
-                  else next.add(i);
-                  setSelected(next);
-                }}
-              />
+              {canAssignRoles && (
+                <Checkbox
+                  size="xs"
+                  disabled={isSelf}
+                  checked={selected.has(i)}
+                  onChange={() => {
+                    const next = new Set(selected);
+                    if (next.has(i)) next.delete(i);
+                    else next.add(i);
+                    setSelected(next);
+                  }}
+                />
+              )}
               <Stack gap={0} style={{ minWidth: 0 }}>
                 <Group gap={4} wrap="nowrap">
                   <Text size="sm" fw={500} truncate>
@@ -346,17 +372,19 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
               <Badge color={ROLE_COLORS[a.role] ?? "gray"} size="sm">
                 {a.role}
               </Badge>
-              <Button
-                size="compact-xs"
-                color="red"
-                variant="subtle"
-                loading={revokeMutation.isPending}
-                disabled={isSelf}
-                title={isSelf ? "Cannot revoke your own role" : undefined}
-                onClick={() => revokeMutation.mutate(a)}
-              >
-                ×
-              </Button>
+              {canAssignRoles && (
+                <Button
+                  size="compact-xs"
+                  color="red"
+                  variant="subtle"
+                  loading={revokeMutation.isPending}
+                  disabled={isSelf}
+                  title={isSelf ? "Cannot revoke your own role" : undefined}
+                  onClick={() => revokeMutation.mutate(a)}
+                >
+                  ×
+                </Button>
+              )}
             </Group>
           </Group>
         );
@@ -364,6 +392,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
 
       <Divider mt="xs" />
 
+      {canAssignRoles && <>
       <Text size="sm" fw={600}>
         Assign role
       </Text>
@@ -415,6 +444,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
       >
         Assign
       </Button>
+      </>}
     </Stack>
   );
 
@@ -440,7 +470,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
             </Accordion.Control>
             <Accordion.Panel>
               <Stack gap="xs">
-                {g.member_ids.length > 1 && (
+                {canManageGroup(g) && g.member_ids.length > 1 && (
                   <Group gap="xs">
                     <Checkbox
                       size="xs"
@@ -461,7 +491,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                     />
                   </Group>
                 )}
-                {(groupMemberSelected[g.id]?.size ?? 0) > 0 && (
+                {canManageGroup(g) && (groupMemberSelected[g.id]?.size ?? 0) > 0 && (
                   <Group gap="xs">
                     <Text size="xs" c="dimmed">{groupMemberSelected[g.id]?.size} selected</Text>
                     <Button
@@ -485,17 +515,19 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                   return (
                     <Group key={mid} justify="space-between" wrap="nowrap" opacity={isSelf ? 0.5 : 1}>
                       <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
-                        <Checkbox
-                          size="xs"
-                          disabled={isSelf}
-                          checked={groupMemberSelected[g.id]?.has(mid) ?? false}
-                          onChange={() => {
-                            const current = new Set(groupMemberSelected[g.id] ?? []);
-                            if (current.has(mid)) current.delete(mid);
-                            else current.add(mid);
-                            setGroupMemberSelected((prev) => ({ ...prev, [g.id]: current }));
-                          }}
-                        />
+                        {canManageGroup(g) && (
+                          <Checkbox
+                            size="xs"
+                            disabled={isSelf}
+                            checked={groupMemberSelected[g.id]?.has(mid) ?? false}
+                            onChange={() => {
+                              const current = new Set(groupMemberSelected[g.id] ?? []);
+                              if (current.has(mid)) current.delete(mid);
+                              else current.add(mid);
+                              setGroupMemberSelected((prev) => ({ ...prev, [g.id]: current }));
+                            }}
+                          />
+                        )}
                         <Text size="xs" truncate>
                           {userById[mid] ?? mid}
                           {isSelf && (
@@ -503,84 +535,93 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                           )}
                         </Text>
                       </Group>
-                      <Button
-                        size="compact-xs"
-                        variant="subtle"
-                        color="red"
-                        loading={removeMemberMutation.isPending}
-                        disabled={isSelf}
-                        title={isSelf ? "Cannot remove yourself from a group" : undefined}
-                        onClick={() => removeMemberMutation.mutate({ gid: g.id, memberId: mid })}
-                      >
-                        ×
-                      </Button>
+                      {canManageGroup(g) && (
+                        <Button
+                          size="compact-xs"
+                          variant="subtle"
+                          color="red"
+                          loading={removeMemberMutation.isPending}
+                          disabled={isSelf}
+                          title={isSelf ? "Cannot remove yourself from a group" : undefined}
+                          onClick={() => removeMemberMutation.mutate({ gid: g.id, memberId: mid })}
+                        >
+                          ×
+                        </Button>
+                      )}
                     </Group>
                   );
                 })}
-                <Group gap="xs" mt={4}>
-                  <Autocomplete
-                    placeholder="Add by email"
-                    data={users?.map((u) => u.email) ?? []}
-                    value={groupMemberEmail[g.id] ?? ""}
-                    onChange={(v) =>
-                      setGroupMemberEmail((prev) => ({ ...prev, [g.id]: v }))
-                    }
-                    size="xs"
-                    style={{ flex: 1 }}
-                  />
-                  <Button
-                    size="xs"
-                    disabled={!groupMemberEmail[g.id]}
-                    loading={addMemberMutation.isPending}
-                    onClick={() => {
-                      addMemberMutation.mutate({
-                        gid: g.id,
-                        memberEmail: groupMemberEmail[g.id] ?? "",
-                      });
-                      setGroupMemberEmail((prev) => ({ ...prev, [g.id]: "" }));
-                    }}
-                  >
-                    Add
-                  </Button>
-                </Group>
-                <Button
-                  size="xs"
-                  color="red"
-                  variant="light"
-                  loading={deleteGroupMutation.isPending}
-                  onClick={() => deleteGroupMutation.mutate(g.id)}
-                >
-                  Delete group
-                </Button>
+                {canManageGroup(g) && (
+                  <>
+                    <Group gap="xs" mt={4}>
+                      <Autocomplete
+                        placeholder="Add by email"
+                        data={users?.map((u) => u.email) ?? []}
+                        value={groupMemberEmail[g.id] ?? ""}
+                        onChange={(v) =>
+                          setGroupMemberEmail((prev) => ({ ...prev, [g.id]: v }))
+                        }
+                        size="xs"
+                        style={{ flex: 1 }}
+                      />
+                      <Button
+                        size="xs"
+                        disabled={!groupMemberEmail[g.id]}
+                        loading={addMemberMutation.isPending}
+                        onClick={() => {
+                          addMemberMutation.mutate({
+                            gid: g.id,
+                            memberEmail: groupMemberEmail[g.id] ?? "",
+                          });
+                          setGroupMemberEmail((prev) => ({ ...prev, [g.id]: "" }));
+                        }}
+                      >
+                        Add
+                      </Button>
+                    </Group>
+                    <Button
+                      size="xs"
+                      color="red"
+                      variant="light"
+                      loading={deleteGroupMutation.isPending}
+                      onClick={() => deleteGroupMutation.mutate(g.id)}
+                    >
+                      Delete group
+                    </Button>
+                  </>
+                )}
               </Stack>
             </Accordion.Panel>
           </Accordion.Item>
         ))}
       </Accordion>
 
-      <Divider mt="xs" />
-
-      <Text size="sm" fw={600}>
-        New group
-      </Text>
-      <Group gap="xs">
-        <TextInput
-          placeholder="Group name"
-          value={groupName}
-          onChange={(e) => setGroupName(e.currentTarget.value)}
-          onKeyDown={(e) => e.key === "Enter" && groupName && createGroupMutation.mutate()}
-          size="xs"
-          style={{ flex: 1 }}
-        />
-        <Button
-          size="xs"
-          disabled={!groupName}
-          loading={createGroupMutation.isPending}
-          onClick={() => createGroupMutation.mutate()}
-        >
-          Create
-        </Button>
-      </Group>
+      {canCreateGroup && (
+        <>
+          <Divider mt="xs" />
+          <Text size="sm" fw={600}>
+            New group
+          </Text>
+          <Group gap="xs">
+            <TextInput
+              placeholder="Group name"
+              value={groupName}
+              onChange={(e) => setGroupName(e.currentTarget.value)}
+              onKeyDown={(e) => e.key === "Enter" && groupName && createGroupMutation.mutate()}
+              size="xs"
+              style={{ flex: 1 }}
+            />
+            <Button
+              size="xs"
+              disabled={!groupName}
+              loading={createGroupMutation.isPending}
+              onClick={() => createGroupMutation.mutate()}
+            >
+              Create
+            </Button>
+          </Group>
+        </>
+      )}
     </Stack>
   );
 

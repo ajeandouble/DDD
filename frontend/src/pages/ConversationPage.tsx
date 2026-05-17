@@ -34,7 +34,7 @@ export function ConversationPage() {
     refetchInterval: (query) => {
       const c = query.state.data;
       if (!c) return 3000;
-      return Array.isArray(c.content) ? false : 3000;
+      return c.type === "conversation" && Array.isArray(c.content) && c.content.length === 0 ? 3000 : false;
     },
     retry: false,
   });
@@ -51,8 +51,10 @@ export function ConversationPage() {
 
   const storageKey = importJobs?.find((j) => j.storage_key)?.storage_key ?? null;
   const audioUrl = storageKey ? `/api/storage/${storageKey}` : null;
-  const turns = Array.isArray(conv.content) ? (conv.content as SpeakerTurn[]) : null;
-  const isTranscribing = !!storageKey && !turns;
+  const turns = conv.type === "conversation" && Array.isArray(conv.content) && conv.content.length > 0
+    ? (conv.content as SpeakerTurn[])
+    : null;
+  const isTranscribing = !!storageKey && conv.type === "conversation" && !turns;
 
   return (
     <Stack gap="md">
@@ -69,7 +71,7 @@ export function ConversationPage() {
 
       <Group gap="xs">
         <Text size="xs" c="dimmed">
-          {new Date(conv.timestamp).toLocaleString()}
+          {new Date(conv.conversation_timestamp).toLocaleString()}
         </Text>
         {conv.stats.duration_seconds != null && (
           <Badge size="xs" variant="outline">

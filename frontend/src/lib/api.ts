@@ -56,18 +56,20 @@ export const searchConversations = (
 
 export const createConversation = (data: {
   title: string;
-  content: string;
+  content: string | Array<{ speaker: string; text: string; words?: Array<{ word: string; start: number; end: number }> }>;
+  type?: "review" | "conversation";
+  conversation_timestamp?: string;
   metadata?: { key: string; value: string }[];
   organization_id?: string;
-  scope_id?: string;
-  scope_type?: string;
+  scope_id: string;
+  scope_type?: "campaign";
   tag_ids?: string[];
 }): Promise<ConversationResponse> =>
   api.post("conversations/", { json: data, headers: authHeaders() }).json();
 
 export const updateConversation = (
   id: string,
-  data: { title?: string; content?: string }
+  data: { title?: string; content?: string | unknown[] }
 ): Promise<ConversationResponse> =>
   api.patch(`conversations/${id}`, { json: data, headers: authHeaders() }).json();
 
@@ -112,6 +114,21 @@ export const createSubproject = (projectId: string, name: string): Promise<Subpr
   api
     .post(`scopes/projects/${projectId}/subprojects/`, { json: { name }, headers: authHeaders() })
     .json();
+
+export const getCampaign = (campaignId: string): Promise<Campaign> =>
+  api.get(`scopes/campaigns/${campaignId}`, { headers: authHeaders() }).json();
+
+export const getCampaignsByOrg = (orgId: string): Promise<Campaign[]> =>
+  api.get(`scopes/organizations/${orgId}/campaigns/`, { headers: authHeaders() }).json();
+
+export const createCampaignUnderOrg = (orgId: string, name: string): Promise<Campaign> =>
+  api.post(`scopes/organizations/${orgId}/campaigns/`, { json: { name }, headers: authHeaders() }).json();
+
+export const getCampaignsByProject = (projectId: string): Promise<Campaign[]> =>
+  api.get(`scopes/projects/${projectId}/campaigns/`, { headers: authHeaders() }).json();
+
+export const createCampaignUnderProject = (projectId: string, name: string): Promise<Campaign> =>
+  api.post(`scopes/projects/${projectId}/campaigns/`, { json: { name }, headers: authHeaders() }).json();
 
 export const getCampaigns = (subprojectId: string): Promise<Campaign[]> =>
   api.get(`scopes/subprojects/${subprojectId}/campaigns/`, { headers: authHeaders() }).json();
@@ -162,9 +179,17 @@ export const revokeRole = (
 export const listGroups = (orgId: string): Promise<IamGroup[]> =>
   api.get(`iam/organizations/${orgId}/groups`, { headers: authHeaders() }).json();
 
-export const createGroup = (orgId: string, name: string): Promise<IamGroup> =>
+export const createGroup = (
+  orgId: string,
+  name: string,
+  scopeType?: string,
+  scopeId?: string,
+): Promise<IamGroup> =>
   api
-    .post(`iam/organizations/${orgId}/groups`, { json: { name }, headers: authHeaders() })
+    .post(`iam/organizations/${orgId}/groups`, {
+      json: { name, scope_type: scopeType ?? null, scope_id: scopeId ?? null },
+      headers: authHeaders(),
+    })
     .json();
 
 export const deleteGroup = (orgId: string, groupId: string): Promise<void> =>

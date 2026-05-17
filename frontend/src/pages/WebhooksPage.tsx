@@ -18,7 +18,7 @@ const DEFAULT_SAMPLE_PAYLOAD = JSON.stringify(
     conversation_id: "00000000-0000-0000-0000-000000000000",
     org_id: "00000000-0000-0000-0000-000000000002",
     title: "Interview — Matilda",
-    timestamp: "2025-05-16T10:00:00Z",
+    conversation_timestamp: "2025-05-16T10:00:00Z",
     scope_type: "campaign",
     scope_id: "00000000-0000-0000-0000-000000000003",
     metadata: [{ key: "interviewer", value: "Alice" }],
@@ -53,7 +53,7 @@ const DEFAULT_SAMPLE_PAYLOAD = JSON.stringify(
   2,
 );
 
-const DEFAULT_TRANSFORMER = `# payload keys: event, conversation_id, org_id, title, timestamp,
+const DEFAULT_TRANSFORMER = `# payload keys: event, conversation_id, org_id, title, conversation_timestamp,
 #   scope_type, scope_id, metadata, content (speaker turns), stats
 result = {
     "title": payload["title"],

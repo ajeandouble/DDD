@@ -24,7 +24,6 @@ import {
   getCampaigns,
   createCampaign,
 } from "../lib/api";
-import { ConversationsSection } from "../components/ConversationsSection";
 import { MembersDrawer } from "../components/MembersDrawer";
 import { useCanManageMembers } from "../hooks/useMyRoles";
 
@@ -126,18 +125,12 @@ export function CampaignsPage() {
         </Group>
 
         <MembersDrawer
+          showGroups
           orgId={orgId!}
           scopeType="subproject"
           scopeId={subprojectId!}
           opened={membersOpened}
           onClose={closeMembers}
-        />
-
-        <ConversationsSection
-          organizationId={orgId!}
-          scopeId={subprojectId!}
-          scopeType="subproject"
-          queryKey={["subproject", subprojectId!]}
         />
 
         <Group justify="space-between" mt="sm">
@@ -164,11 +157,7 @@ export function CampaignsPage() {
               radius="md"
               withBorder
               style={{ cursor: "pointer" }}
-              onClick={() =>
-                navigate(
-                  `/orgs/${orgId}/projects/${projectId}/subprojects/${subprojectId}/campaigns/${campaign.id}`
-                )
-              }
+              onClick={() => navigate(`/campaigns/${campaign.id}`)}
             >
               <Text fw={500}>{campaign.name}</Text>
             </Card>

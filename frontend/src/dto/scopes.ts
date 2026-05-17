@@ -31,7 +31,9 @@ export type Subproject = z.infer<typeof SubprojectSchema>;
 export const CampaignSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
-  subproject_id: z.string().uuid(),
+  parent_type: z.enum(["organization", "project", "subproject"]),
+  parent_id: z.string().uuid(),
+  organization_id: z.string().uuid(),
   created_at: z.string(),
 });
 

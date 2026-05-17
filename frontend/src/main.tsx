@@ -26,6 +26,7 @@ const router = createBrowserRouter([
       { path: "/", element: <Navigate to="/orgs" replace /> },
       { path: "/settings", element: <SettingsPage /> },
       { path: "/conversations/:convId", element: <ConversationPage /> },
+      { path: "/campaigns/:campaignId", element: <CampaignPage /> },
       { path: "/orgs/:orgId/webhooks", element: <WebhooksPage /> },
       { path: "/orgs", element: <OrganizationsPage /> },
       { path: "/orgs/:orgId", element: <ProjectsPage /> },
@@ -33,10 +34,6 @@ const router = createBrowserRouter([
       {
         path: "/orgs/:orgId/projects/:projectId/subprojects/:subprojectId",
         element: <CampaignsPage />,
-      },
-      {
-        path: "/orgs/:orgId/projects/:projectId/subprojects/:subprojectId/campaigns/:campaignId",
-        element: <CampaignPage />,
       },
     ],
   },

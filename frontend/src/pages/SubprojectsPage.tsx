@@ -17,8 +17,14 @@ import {
   Anchor,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { getOrganization, getProject, getSubprojects, createSubproject } from "../lib/api";
-import { ConversationsSection } from "../components/ConversationsSection";
+import {
+  getOrganization,
+  getProject,
+  getSubprojects,
+  createSubproject,
+  getCampaignsByProject,
+  createCampaignUnderProject,
+} from "../lib/api";
 import { MembersDrawer } from "../components/MembersDrawer";
 import { useCanManageMembers } from "../hooks/useMyRoles";
 
@@ -26,10 +32,14 @@ export function SubprojectsPage() {
   const { orgId, projectId } = useParams<{ orgId: string; projectId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [opened, { open, close }] = useDisclosure(false);
+  const [subprojectModalOpened, { open: openSubprojectModal, close: closeSubprojectModal }] =
+    useDisclosure(false);
+  const [campaignModalOpened, { open: openCampaignModal, close: closeCampaignModal }] =
+    useDisclosure(false);
   const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
   const canManageMembers = useCanManageMembers(orgId, "project", projectId);
-  const [name, setName] = useState("");
+  const [subprojectName, setSubprojectName] = useState("");
+  const [campaignName, setCampaignName] = useState("");
 
   const { data: org } = useQuery({
     queryKey: ["organization", orgId],
@@ -43,43 +53,100 @@ export function SubprojectsPage() {
     retry: false,
   });
 
-  const { data, isLoading, error } = useQuery({
+  const { data: subprojects, isLoading: subprojectsLoading, error: subprojectsError } = useQuery({
     queryKey: ["subprojects", projectId],
     queryFn: () => getSubprojects(projectId!),
     retry: false,
   });
 
-  const createMutation = useMutation({
-    mutationFn: () => createSubproject(projectId!, name),
+  const { data: campaigns, isLoading: campaignsLoading } = useQuery({
+    queryKey: ["campaigns-by-project", projectId],
+    queryFn: () => getCampaignsByProject(projectId!),
+    retry: false,
+  });
+
+  const createSubprojectMutation = useMutation({
+    mutationFn: () => createSubproject(projectId!, subprojectName),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subprojects", projectId] });
-      close();
-      setName("");
+      closeSubprojectModal();
+      setSubprojectName("");
+    },
+  });
+
+  const createCampaignMutation = useMutation({
+    mutationFn: () => createCampaignUnderProject(projectId!, campaignName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns-by-project", projectId] });
+      closeCampaignModal();
+      setCampaignName("");
     },
   });
 
   return (
     <>
-      <Modal opened={opened} onClose={close} title="New subproject" centered>
+      <Modal
+        opened={subprojectModalOpened}
+        onClose={closeSubprojectModal}
+        title="New subproject"
+        centered
+      >
         <Stack>
           <TextInput
             label="Name"
             placeholder="Phase 1"
-            value={name}
-            onChange={(e) => setName(e.currentTarget.value)}
-            onKeyDown={(e) => e.key === "Enter" && createMutation.mutate()}
+            value={subprojectName}
+            onChange={(e) => setSubprojectName(e.currentTarget.value)}
+            onKeyDown={(e) => e.key === "Enter" && createSubprojectMutation.mutate()}
             data-autofocus
           />
-          {createMutation.isError && (
+          {createSubprojectMutation.isError && (
             <Text size="sm" c="red">
-              {String(createMutation.error)}
+              {String(createSubprojectMutation.error)}
             </Text>
           )}
           <Group justify="flex-end">
-            <Button variant="default" onClick={close}>
+            <Button variant="default" onClick={closeSubprojectModal}>
               Cancel
             </Button>
-            <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
+            <Button
+              onClick={() => createSubprojectMutation.mutate()}
+              loading={createSubprojectMutation.isPending}
+            >
+              Create
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={campaignModalOpened}
+        onClose={closeCampaignModal}
+        title="New campaign"
+        centered
+      >
+        <Stack>
+          <TextInput
+            label="Name"
+            placeholder="Email blast Jan 2025"
+            value={campaignName}
+            onChange={(e) => setCampaignName(e.currentTarget.value)}
+            onKeyDown={(e) => e.key === "Enter" && createCampaignMutation.mutate()}
+            data-autofocus
+          />
+          {createCampaignMutation.isError && (
+            <Text size="sm" c="red">
+              {String(createCampaignMutation.error)}
+            </Text>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeCampaignModal}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createCampaignMutation.mutate()}
+              loading={createCampaignMutation.isPending}
+            >
               Create
             </Button>
           </Group>
@@ -107,6 +174,7 @@ export function SubprojectsPage() {
         </Group>
 
         <MembersDrawer
+          showGroups
           orgId={orgId!}
           scopeType="project"
           scopeId={projectId!}
@@ -114,30 +182,54 @@ export function SubprojectsPage() {
           onClose={closeMembers}
         />
 
-        <ConversationsSection
-          organizationId={orgId!}
-          scopeId={projectId!}
-          scopeType="project"
-          queryKey={["project", projectId!]}
-        />
+        {/* Direct campaigns under this project */}
+        <Group justify="space-between" mt="sm">
+          <Text fw={600}>Campaigns</Text>
+          <Button size="xs" onClick={openCampaignModal}>
+            New campaign
+          </Button>
+        </Group>
 
+        {campaignsLoading && <Loader size="sm" />}
+        {campaigns?.length === 0 && (
+          <Text c="dimmed" size="sm">
+            No campaigns yet.
+          </Text>
+        )}
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+          {campaigns?.map((c) => (
+            <Card
+              key={c.id}
+              shadow="sm"
+              padding="md"
+              radius="md"
+              withBorder
+              style={{ cursor: "pointer" }}
+              onClick={() => navigate(`/campaigns/${c.id}`)}
+            >
+              <Text fw={500}>{c.name}</Text>
+            </Card>
+          ))}
+        </SimpleGrid>
+
+        {/* Subprojects */}
         <Group justify="space-between" mt="sm">
           <Text fw={600}>Subprojects</Text>
-          <Button size="xs" onClick={open}>
+          <Button size="xs" onClick={openSubprojectModal}>
             New subproject
           </Button>
         </Group>
 
-        {isLoading && <Loader />}
-        {error && <Alert color="red">{String(error)}</Alert>}
-        {data?.length === 0 && (
+        {subprojectsLoading && <Loader />}
+        {subprojectsError && <Alert color="red">{String(subprojectsError)}</Alert>}
+        {subprojects?.length === 0 && (
           <Text c="dimmed" size="sm">
             No subprojects yet.
           </Text>
         )}
 
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-          {data?.map((sp) => (
+          {subprojects?.map((sp) => (
             <Card
               key={sp.id}
               shadow="sm"
