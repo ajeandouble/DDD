@@ -26,6 +26,7 @@ class UpdateConversationCommand:
     title: str | None = None
     content: str | list[dict] | None = None
     metadata: list[tuple[str, str]] | None = None
+    tag_ids: list[UUID] | None = None
 
 
 class ConversationNotFound(Exception):
@@ -60,6 +61,7 @@ class ConversationCommandHandler:
             title=cmd.title,
             content=cmd.content,
             metadata=cmd.metadata,
+            tag_ids=cmd.tag_ids,
         )
         await self._repo.update(c)
         return c

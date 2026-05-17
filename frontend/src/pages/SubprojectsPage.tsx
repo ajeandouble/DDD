@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Title,
   Group,
   Button,
   Modal,
@@ -24,10 +23,12 @@ import {
   getCampaignsByProject,
   createCampaignUnderProject,
   updateProjectSettings,
+  renameProject,
 } from "../lib/api";
 import { MembersDrawer } from "../components/MembersDrawer";
 import { ScopeCard } from "../components/ScopeCard";
 import { ScopeSettingsModal } from "../components/ScopeSettingsModal";
+import { EditableTitle } from "../components/EditableTitle";
 import { useCanManageMembers } from "../hooks/useMyRoles";
 
 export function SubprojectsPage() {
@@ -203,7 +204,14 @@ export function SubprojectsPage() {
               : undefined
           }
         >
-          <Title order={2}>{project?.name}</Title>
+          <EditableTitle
+            value={project?.name ?? ""}
+            order={2}
+            canEdit={canManageMembersOnScope}
+            onSave={(name) => renameProject(projectId!, name).then((p) => {
+              queryClient.setQueryData(["project", projectId], p);
+            })}
+          />
           <Group gap={6}>
             {canManageMembersOnScope && (
               <Button size="xs" variant="light" onClick={openSettings}>
@@ -274,9 +282,7 @@ export function SubprojectsPage() {
               key={sp.id}
               name={sp.name}
               color={sp.color}
-              onClick={() =>
-                navigate(`/orgs/${orgId}/projects/${projectId}/subprojects/${sp.id}`)
-              }
+              onClick={() => navigate(`/orgs/${orgId}/projects/${projectId}/subprojects/${sp.id}`)}
             />
           ))}
         </SimpleGrid>

@@ -76,6 +76,7 @@ class Conversation:
         title: str | None = None,
         content: str | list[dict] | None = None,
         metadata: list[tuple[str, str]] | None = None,
+        tag_ids: list[UUID] | None = None,
     ) -> None:
         if title is not None:
             self.title = title
@@ -83,6 +84,8 @@ class Conversation:
             self.content = content
         if metadata is not None:
             self.metadata = metadata
+        if tag_ids is not None:
+            self.tag_ids = tag_ids
 
     def update_stats(self, stats: ConversationStats) -> None:
         self.stats = stats

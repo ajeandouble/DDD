@@ -15,6 +15,9 @@ from src.scopes.application.commands import (
     NotAMember,
     OrganizationCommandHandler,
     ProjectCommandHandler,
+    RenameCampaignCommand,
+    RenameProjectCommand,
+    RenameSubprojectCommand,
     ScopeNotFound,
     SubprojectCommandHandler,
 )
@@ -24,7 +27,7 @@ from src.scopes.application.queries import (
     ProjectQueryHandler,
     SubprojectQueryHandler,
 )
-from src.scopes.domain.models import Campaign, Organization, Project, Subproject
+from src.scopes.domain.models import Campaign, Organization, Project, Subproject, VALID_COLORS
 from src.scopes.domain.repositories import (
     CampaignRepository,
     OrganizationRepository,
@@ -150,6 +153,7 @@ class ProjectResponse(BaseModel):
     name: str
     organization_id: UUID
     created_at: str
+    color: str | None = None
 
 
 class SubprojectResponse(BaseModel):
@@ -157,6 +161,15 @@ class SubprojectResponse(BaseModel):
     name: str
     project_id: UUID
     created_at: str
+    color: str | None = None
+
+
+class ScopeSettingsBody(BaseModel):
+    color: str | None = None
+
+
+class ScopeRenameBody(BaseModel):
+    name: str
 
 
 class CampaignResponse(BaseModel):
@@ -166,6 +179,7 @@ class CampaignResponse(BaseModel):
     parent_id: UUID
     organization_id: UUID
     created_at: str
+    color: str | None = None
 
 
 def _org_resp(org: Organization) -> OrgResponse:
@@ -184,6 +198,7 @@ def _project_resp(p: Project) -> ProjectResponse:
         name=p.name,
         organization_id=p.organization_id,
         created_at=p.created_at.isoformat(),
+        color=p.color,
     )
 
 
@@ -193,6 +208,7 @@ def _subproject_resp(sp: Subproject) -> SubprojectResponse:
         name=sp.name,
         project_id=sp.project_id,
         created_at=sp.created_at.isoformat(),
+        color=sp.color,
     )
 
 
@@ -204,6 +220,7 @@ def _campaign_resp(c: Campaign) -> CampaignResponse:
         parent_id=c.parent_id,
         organization_id=c.organization_id,
         created_at=c.created_at.isoformat(),
+        color=c.color,
     )
 
 
@@ -400,6 +417,28 @@ async def get_project(
     return _project_resp(project)
 
 
+@router.patch("/projects/{project_id}", response_model=ProjectResponse)
+async def rename_project(
+    project_id: UUID,
+    body: ScopeRenameBody,
+    commands: ProjectCommandHandler = Depends(_project_commands),
+    queries: ProjectQueryHandler = Depends(_project_queries),
+    principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    p = await queries.get_by_id(project_id)
+    if p is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    subj = principal_subject(principal)
+    await _require(
+        await authz.can_do(subj, "manage_members", "project", str(project_id), org_id=str(p.organization_id))
+    )
+    try:
+        return _project_resp(await commands.rename(RenameProjectCommand(project_id=project_id, name=body.name)))
+    except (ScopeNotFound, ValueError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND if isinstance(e, ScopeNotFound) else status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
 # --- Subprojects ---
 
 
@@ -541,6 +580,31 @@ async def get_subproject(
     return _subproject_resp(sp)
 
 
+@router.patch("/subprojects/{subproject_id}", response_model=SubprojectResponse)
+async def rename_subproject(
+    subproject_id: UUID,
+    body: ScopeRenameBody,
+    commands: SubprojectCommandHandler = Depends(_subproject_commands),
+    subproject_queries: SubprojectQueryHandler = Depends(_subproject_queries),
+    project_queries: ProjectQueryHandler = Depends(_project_queries),
+    principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    sp = await subproject_queries.get_by_id(subproject_id)
+    if sp is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subproject not found")
+    project = await project_queries.get_by_id(sp.project_id)
+    org_id = str(project.organization_id) if project else None
+    subj = principal_subject(principal)
+    await _require(
+        await authz.can_do(subj, "manage_members", "subproject", str(subproject_id), org_id=org_id)
+    )
+    try:
+        return _subproject_resp(await commands.rename(RenameSubprojectCommand(subproject_id=subproject_id, name=body.name)))
+    except (ScopeNotFound, ValueError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND if isinstance(e, ScopeNotFound) else status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
 # --- Campaigns under subproject ---
 
 
@@ -621,4 +685,108 @@ async def get_campaign(
     c = await queries.get_by_id(campaign_id)
     if c is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+    return _campaign_resp(c)
+
+
+@router.patch("/campaigns/{campaign_id}", response_model=CampaignResponse)
+async def rename_campaign(
+    campaign_id: UUID,
+    body: ScopeRenameBody,
+    commands: CampaignCommandHandler = Depends(_campaign_commands),
+    queries: CampaignQueryHandler = Depends(_campaign_queries),
+    principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    c = await queries.get_by_id(campaign_id)
+    if c is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+    subj = principal_subject(principal)
+    await _require(
+        await authz.can_do(subj, "manage_members", "campaign", str(campaign_id), org_id=str(c.organization_id))
+    )
+    try:
+        return _campaign_resp(await commands.rename(RenameCampaignCommand(campaign_id=campaign_id, name=body.name)))
+    except (ScopeNotFound, ValueError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND if isinstance(e, ScopeNotFound) else status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
+@router.patch("/projects/{project_id}/settings", response_model=ProjectResponse)
+async def update_project_settings(
+    project_id: UUID,
+    body: ScopeSettingsBody,
+    project_repo: ProjectRepository = Depends(_project_repo),
+    queries: ProjectQueryHandler = Depends(_project_queries),
+    principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    p = await queries.get_by_id(project_id)
+    if p is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    subj = principal_subject(principal)
+    await _require(
+        await authz.can_do(
+            subj, "manage_members", "project", str(project_id), org_id=str(p.organization_id)
+        )
+    )
+    if body.color is not None and body.color not in VALID_COLORS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid color"
+        )
+    p.set_color(body.color)
+    await project_repo.update(p)
+    return _project_resp(p)
+
+
+@router.patch("/subprojects/{subproject_id}/settings", response_model=SubprojectResponse)
+async def update_subproject_settings(
+    subproject_id: UUID,
+    body: ScopeSettingsBody,
+    subproject_repo: SubprojectRepository = Depends(_subproject_repo),
+    subproject_queries: SubprojectQueryHandler = Depends(_subproject_queries),
+    project_queries: ProjectQueryHandler = Depends(_project_queries),
+    principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    sp = await subproject_queries.get_by_id(subproject_id)
+    if sp is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subproject not found")
+    project = await project_queries.get_by_id(sp.project_id)
+    org_id = str(project.organization_id) if project else None
+    subj = principal_subject(principal)
+    await _require(
+        await authz.can_do(subj, "manage_members", "subproject", str(subproject_id), org_id=org_id)
+    )
+    if body.color is not None and body.color not in VALID_COLORS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid color"
+        )
+    sp.set_color(body.color)
+    await subproject_repo.update(sp)
+    return _subproject_resp(sp)
+
+
+@router.patch("/campaigns/{campaign_id}/settings", response_model=CampaignResponse)
+async def update_campaign_settings(
+    campaign_id: UUID,
+    body: ScopeSettingsBody,
+    campaign_repo: CampaignRepository = Depends(_campaign_repo),
+    queries: CampaignQueryHandler = Depends(_campaign_queries),
+    principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    c = await queries.get_by_id(campaign_id)
+    if c is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+    subj = principal_subject(principal)
+    await _require(
+        await authz.can_do(
+            subj, "manage_members", "campaign", str(campaign_id), org_id=str(c.organization_id)
+        )
+    )
+    if body.color is not None and body.color not in VALID_COLORS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid color"
+        )
+    c.set_color(body.color)
+    await campaign_repo.update(c)
     return _campaign_resp(c)

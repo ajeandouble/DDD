@@ -21,7 +21,14 @@ import {
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconArrowLeft, IconEdit, IconTrash } from "@tabler/icons-react";
-import { getConversation, getImportJobs, updateConversation, deleteConversation, listTags, createTag } from "../lib/api";
+import {
+  getConversation,
+  getImportJobs,
+  updateConversation,
+  deleteConversation,
+  listTags,
+  createTag,
+} from "../lib/api";
 import { AudioTranscriptPlayer } from "../components/AudioTranscriptPlayer";
 import type { SpeakerTurn } from "../dto/conversations";
 
@@ -73,8 +80,7 @@ export function ConversationPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: () =>
-      updateConversation(convId!, { title: editTitle, tag_ids: editTagIds }),
+    mutationFn: () => updateConversation(convId!, { title: editTitle, tag_ids: editTagIds }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["conversation", convId] });
       closeEdit();
@@ -146,7 +152,9 @@ export function ConversationPage() {
               onChange={(e) => setNewTagName(e.currentTarget.value)}
               style={{ flex: 1 }}
               size="xs"
-              onKeyDown={(e) => e.key === "Enter" && newTagName.trim() && createTagMutation.mutate()}
+              onKeyDown={(e) =>
+                e.key === "Enter" && newTagName.trim() && createTagMutation.mutate()
+              }
             />
             <Button
               size="xs"
@@ -175,10 +183,17 @@ export function ConversationPage() {
       </Modal>
 
       {/* Delete confirmation modal */}
-      <Modal opened={deleteOpened} onClose={closeDelete} title="Delete conversation?" centered size="sm">
+      <Modal
+        opened={deleteOpened}
+        onClose={closeDelete}
+        title="Delete conversation?"
+        centered
+        size="sm"
+      >
         <Stack>
           <Text size="sm">
-            This will permanently delete <strong>{conv.title}</strong>. This action cannot be undone.
+            This will permanently delete <strong>{conv.title}</strong>. This action cannot be
+            undone.
           </Text>
           {deleteMutation.isError && (
             <Text size="sm" c="red">
@@ -189,7 +204,11 @@ export function ConversationPage() {
             <Button variant="default" onClick={closeDelete}>
               Cancel
             </Button>
-            <Button color="red" onClick={() => deleteMutation.mutate()} loading={deleteMutation.isPending}>
+            <Button
+              color="red"
+              onClick={() => deleteMutation.mutate()}
+              loading={deleteMutation.isPending}
+            >
               Delete
             </Button>
           </Group>

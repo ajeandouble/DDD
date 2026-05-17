@@ -95,6 +95,7 @@ class ConversationUpdate(BaseModel):
     title: str | None = None
     content: str | list[dict] | None = None
     metadata: list[MetadataEntry] | None = None
+    tag_ids: list[UUID] | None = None
 
 
 class ConversationResponse(BaseModel):
@@ -298,6 +299,7 @@ async def update_conversation(
                 metadata=(
                     [(e.key, e.value) for e in body.metadata] if body.metadata is not None else None
                 ),
+                tag_ids=body.tag_ids,
             )
         )
     except ConversationNotFound:

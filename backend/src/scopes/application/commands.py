@@ -35,6 +35,24 @@ class CreateOrganizationCommand:
 
 
 @dataclass
+class RenameProjectCommand:
+    project_id: UUID
+    name: str
+
+
+@dataclass
+class RenameSubprojectCommand:
+    subproject_id: UUID
+    name: str
+
+
+@dataclass
+class RenameCampaignCommand:
+    campaign_id: UUID
+    name: str
+
+
+@dataclass
 class AddMemberCommand:
     org_id: UUID
     user_id: UUID
@@ -95,6 +113,14 @@ class ProjectCommandHandler:
         await publish(ProjectCreated(project_id=project.id, org_id=cmd.organization_id))
         return project
 
+    async def rename(self, cmd: RenameProjectCommand) -> Project:
+        project = await self._repo.find_by_id(cmd.project_id)
+        if project is None:
+            raise ScopeNotFound(cmd.project_id)
+        project.rename(cmd.name)
+        await self._repo.update(project)
+        return project
+
     async def delete(self, project_id: UUID) -> None:
         project = await self._repo.find_by_id(project_id)
         if project is None:
@@ -138,6 +164,14 @@ class SubprojectCommandHandler:
         await self._repo.save(subproject)
         await publish(SubprojectCreated(subproject_id=subproject.id, project_id=cmd.project_id))
         return subproject
+
+    async def rename(self, cmd: RenameSubprojectCommand) -> Subproject:
+        sp = await self._repo.find_by_id(cmd.subproject_id)
+        if sp is None:
+            raise ScopeNotFound(cmd.subproject_id)
+        sp.rename(cmd.name)
+        await self._repo.update(sp)
+        return sp
 
     async def delete(self, subproject_id: UUID) -> None:
         sp = await self._repo.find_by_id(subproject_id)
@@ -190,6 +224,14 @@ class CampaignCommandHandler:
             )
         )
         return campaign
+
+    async def rename(self, cmd: RenameCampaignCommand) -> Campaign:
+        c = await self._repo.find_by_id(cmd.campaign_id)
+        if c is None:
+            raise ScopeNotFound(cmd.campaign_id)
+        c.rename(cmd.name)
+        await self._repo.update(c)
+        return c
 
     async def delete(self, campaign_id: UUID) -> None:
         c = await self._repo.find_by_id(campaign_id)

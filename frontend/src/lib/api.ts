@@ -157,13 +157,20 @@ export const createSubproject = (projectId: string, name: string): Promise<Subpr
 export const getCampaign = (campaignId: string): Promise<Campaign> =>
   api.get(`scopes/campaigns/${campaignId}`, { headers: authHeaders() }).json();
 
+export const renameProject = (projectId: string, name: string): Promise<Project> =>
+  api.patch(`scopes/projects/${projectId}`, { json: { name }, headers: authHeaders() }).json();
+
+export const renameSubproject = (subprojectId: string, name: string): Promise<Subproject> =>
+  api.patch(`scopes/subprojects/${subprojectId}`, { json: { name }, headers: authHeaders() }).json();
+
+export const renameCampaign = (campaignId: string, name: string): Promise<Campaign> =>
+  api.patch(`scopes/campaigns/${campaignId}`, { json: { name }, headers: authHeaders() }).json();
+
 export const updateProjectSettings = (
   projectId: string,
   body: { color: string | null }
 ): Promise<Project> =>
-  api
-    .patch(`scopes/projects/${projectId}/settings`, { json: body, headers: authHeaders() })
-    .json();
+  api.patch(`scopes/projects/${projectId}/settings`, { json: body, headers: authHeaders() }).json();
 
 export const updateSubprojectSettings = (
   subprojectId: string,

@@ -68,6 +68,7 @@ def _project_to_doc(p: Project) -> dict:
         "name": p.name,
         "organization_id": p.organization_id,
         "created_at": p.created_at,
+        "color": p.color,
     }
 
 
@@ -77,6 +78,7 @@ def _project_from_doc(doc: dict) -> Project:
         name=doc["name"],
         organization_id=doc["organization_id"],
         created_at=doc["created_at"],
+        color=doc.get("color"),
     )
 
 
@@ -112,6 +114,7 @@ def _subproject_to_doc(sp: Subproject) -> dict:
         "name": sp.name,
         "project_id": sp.project_id,
         "created_at": sp.created_at,
+        "color": sp.color,
     }
 
 
@@ -121,6 +124,7 @@ def _subproject_from_doc(doc: dict) -> Subproject:
         name=doc["name"],
         project_id=doc["project_id"],
         created_at=doc["created_at"],
+        color=doc.get("color"),
     )
 
 
@@ -158,6 +162,7 @@ def _campaign_to_doc(c: Campaign) -> dict:
         "parent_id": c.parent_id,
         "organization_id": c.organization_id,
         "created_at": c.created_at,
+        "color": c.color,
     }
 
 
@@ -169,6 +174,7 @@ def _campaign_from_doc(doc: dict) -> Campaign:
         parent_id=doc["parent_id"],
         organization_id=doc["organization_id"],
         created_at=doc["created_at"],
+        color=doc.get("color"),
     )
 
 

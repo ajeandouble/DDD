@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Title,
   Group,
   Button,
   Modal,
@@ -23,10 +22,12 @@ import {
   getCampaigns,
   createCampaign,
   updateSubprojectSettings,
+  renameSubproject,
 } from "../lib/api";
 import { MembersDrawer } from "../components/MembersDrawer";
 import { ScopeCard } from "../components/ScopeCard";
 import { ScopeSettingsModal } from "../components/ScopeSettingsModal";
+import { EditableTitle } from "../components/EditableTitle";
 import { useCanManageMembers } from "../hooks/useMyRoles";
 
 export function CampaignsPage() {
@@ -150,7 +151,14 @@ export function CampaignsPage() {
               : undefined
           }
         >
-          <Title order={2}>{subproject?.name}</Title>
+          <EditableTitle
+            value={subproject?.name ?? ""}
+            order={2}
+            canEdit={canManageMembersOnScope}
+            onSave={(name) => renameSubproject(subprojectId!, name).then((sp) => {
+              queryClient.setQueryData(["subproject", subprojectId], sp);
+            })}
+          />
           <Group gap={6}>
             {canManageMembersOnScope && (
               <Button size="xs" variant="light" onClick={openSettings}>

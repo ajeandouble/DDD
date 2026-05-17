@@ -1,11 +1,19 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Title, Stack, Breadcrumbs, Anchor, Text, Group, Button } from "@mantine/core";
+import { Stack, Breadcrumbs, Anchor, Text, Group, Button } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { getCampaign, getOrganization, getProject, getSubproject, updateCampaignSettings } from "../lib/api";
+import {
+  getCampaign,
+  getOrganization,
+  getProject,
+  getSubproject,
+  updateCampaignSettings,
+  renameCampaign,
+} from "../lib/api";
 import { ConversationsSection } from "../components/ConversationsSection";
 import { MembersDrawer } from "../components/MembersDrawer";
 import { ScopeSettingsModal } from "../components/ScopeSettingsModal";
+import { EditableTitle } from "../components/EditableTitle";
 import { useCanManageMembers, useMyRoles } from "../hooks/useMyRoles";
 import { getEffectiveRole, canManageMembers } from "../dto/permissions";
 
@@ -89,7 +97,14 @@ export function CampaignPage() {
             : undefined
         }
       >
-        <Title order={2}>{campaign?.name}</Title>
+        <EditableTitle
+          value={campaign?.name ?? ""}
+          order={2}
+          canEdit={canSettings}
+          onSave={(name) => renameCampaign(campaignId!, name).then((c) => {
+            queryClient.setQueryData(["campaign", campaignId], c);
+          })}
+        />
         <Group gap={6}>
           {canSettings && (
             <Button size="xs" variant="light" onClick={openSettings}>
