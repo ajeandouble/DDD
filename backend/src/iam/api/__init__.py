@@ -16,6 +16,10 @@ def _auth_service() -> AuthService:
     return AuthService(MongoUserRepository(get_db()))
 
 
+def _user_repo() -> MongoUserRepository:
+    return MongoUserRepository(get_db())
+
+
 class Credentials(BaseModel):
     email: str
     password: str
@@ -29,7 +33,12 @@ class TokenResponse(BaseModel):
 class UserResponse(BaseModel):
     id: UUID
     email: str
+    locale: str
     created_at: str
+
+
+class PreferencesBody(BaseModel):
+    locale: str
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -50,6 +59,26 @@ async def login(body: Credentials, svc: AuthService = Depends(_auth_service)):
     return TokenResponse(access_token=token)
 
 
+def _user_resp(user: User) -> UserResponse:
+    return UserResponse(
+        id=user.id, email=user.email, locale=user.locale, created_at=user.created_at.isoformat()
+    )
+
+
 @router.get("/me", response_model=UserResponse)
 async def me(user: User = Depends(get_current_user)):
-    return UserResponse(id=user.id, email=user.email, created_at=user.created_at.isoformat())
+    return _user_resp(user)
+
+
+@router.patch("/me/preferences", response_model=UserResponse)
+async def update_preferences(
+    body: PreferencesBody,
+    user: User = Depends(get_current_user),
+    repo: MongoUserRepository = Depends(_user_repo),
+):
+    try:
+        user.set_locale(body.locale)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    await repo.update(user)
+    return _user_resp(user)

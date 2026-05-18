@@ -6,12 +6,15 @@ from uuid import UUID, uuid4
 
 import bcrypt
 
+_SUPPORTED_LOCALES = {"en", "fr", "es", "it", "de", "ja", "zh"}
+
 
 @dataclass
 class User:
     id: UUID
     email: str
     password_hash: str
+    locale: str = "en"
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
@@ -25,6 +28,11 @@ class User:
 
     def verify_password(self, password: str) -> bool:
         return bcrypt.checkpw(password.encode(), self.password_hash.encode())
+
+    def set_locale(self, locale: str) -> None:
+        if locale not in _SUPPORTED_LOCALES:
+            raise ValueError(f"Unsupported locale: {locale}")
+        self.locale = locale
 
 
 class Role(StrEnum):

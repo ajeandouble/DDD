@@ -19,6 +19,7 @@ import {
   Checkbox,
   Paper,
 } from "@mantine/core";
+import { useTranslation } from "react-i18next";
 import {
   listRoles,
   assignRole,
@@ -33,13 +34,6 @@ import {
   getMyRoles,
 } from "../lib/api";
 import type { RoleAssignment } from "../dto/iam";
-
-const ROLE_OPTIONS = [
-  { value: "admin", label: "Admin" },
-  { value: "supervisor", label: "Supervisor" },
-  { value: "editor", label: "Editor" },
-  { value: "viewer", label: "Viewer" },
-];
 
 const ROLE_COLORS: Record<string, string> = {
   admin: "red",
@@ -59,6 +53,14 @@ interface Props {
 
 export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, showGroups }: Props) {
   const qc = useQueryClient();
+  const { t } = useTranslation();
+
+  const ROLE_OPTIONS = [
+    { value: "admin", label: t("roles.admin") },
+    { value: "supervisor", label: t("roles.supervisor") },
+    { value: "editor", label: t("roles.editor") },
+    { value: "viewer", label: t("roles.viewer") },
+  ];
 
   const [subjectType, setSubjectType] = useState<"user" | "group">("user");
   const [email, setEmail] = useState("");
@@ -135,7 +137,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
     if (subject.startsWith("user:")) return userById[subject.slice(5)] ?? subject;
     if (subject.startsWith("group:")) {
       const name = groupById[subject.slice(6)];
-      return name ? `Group: ${name}` : subject;
+      return name ? `${t("members.subjectType.group")}: ${name}` : subject;
     }
     if (subject.startsWith("apikey:")) return `API Key: ${subject.slice(7, 15)}…`;
     return subject;
@@ -149,9 +151,9 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
 
   const assignMutation = useMutation({
     mutationFn: () => {
-      if (!role) throw new Error("Pick a role");
+      if (!role) throw new Error(t("members.pickRole"));
       if (subjectType === "group") {
-        if (!groupSubject) throw new Error("Pick a group");
+        if (!groupSubject) throw new Error(t("members.pickGroup"));
         return assignRole(orgId, {
           subject: `group:${groupSubject}`,
           role,
@@ -160,7 +162,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
         });
       }
       const found = users?.find((u) => u.email === email);
-      if (!found) throw new Error("Pick a valid user");
+      if (!found) throw new Error(t("members.userNotFound"));
       return assignRole(orgId, {
         subject: `user:${found.id}`,
         role,
@@ -249,7 +251,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
   const addMemberMutation = useMutation({
     mutationFn: ({ gid, memberEmail }: { gid: string; memberEmail: string }) => {
       const found = users?.find((u) => u.email === memberEmail);
-      if (!found) throw new Error("User not found");
+      if (!found) throw new Error(t("members.userNotFound"));
       return addGroupMember(orgId, gid, found.id);
     },
     onSuccess: invalidateGroups,
@@ -285,11 +287,10 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
       {rolesError && <Alert color="red">{String(rolesError)}</Alert>}
       {roles?.length === 0 && (
         <Text size="sm" c="dimmed">
-          No role assignments at this scope.
+          {t("members.noRoles")}
         </Text>
       )}
 
-      {/* Select-all row */}
       {canAssignRoles && (roles?.length ?? 0) > 1 && (
         <Group gap="xs">
           <Checkbox
@@ -305,19 +306,18 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
             }}
             label={
               <Text size="xs" c="dimmed">
-                Select all
+                {t("members.selectAll")}
               </Text>
             }
           />
         </Group>
       )}
 
-      {/* Bulk action bar */}
       {canAssignRoles && selected.size > 0 && (
         <Paper withBorder p="xs" radius="sm">
           <Group gap="xs" wrap="wrap">
             <Text size="xs" c="dimmed">
-              {selected.size} selected
+              {t("members.selected", { count: selected.size })}
             </Text>
             <Button
               size="compact-xs"
@@ -326,11 +326,11 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
               loading={bulkRevokeMutation.isPending}
               onClick={() => bulkRevokeMutation.mutate()}
             >
-              Revoke all
+              {t("members.revokeAll")}
             </Button>
             <Select
               size="xs"
-              placeholder="Reassign to…"
+              placeholder={t("members.reassignPlaceholder")}
               data={ROLE_OPTIONS}
               value={bulkRole}
               onChange={setBulkRole}
@@ -342,7 +342,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
               loading={bulkReassignMutation.isPending}
               onClick={() => bulkRole && bulkReassignMutation.mutate(bulkRole)}
             >
-              Apply
+              {t("members.apply")}
             </Button>
           </Group>
         </Paper>
@@ -373,7 +373,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                   </Text>
                   {isSelf && (
                     <Text size="xs" c="dimmed">
-                      (you)
+                      {t("members.you")}
                     </Text>
                   )}
                 </Group>
@@ -384,7 +384,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
             </Group>
             <Group gap="xs" wrap="nowrap">
               <Badge color={ROLE_COLORS[a.role] ?? "gray"} size="sm">
-                {a.role}
+                {t(`roles.${a.role}`, { defaultValue: a.role })}
               </Badge>
               {canAssignRoles && (
                 <Button
@@ -393,7 +393,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                   variant="subtle"
                   loading={revokeMutation.isPending}
                   disabled={isSelf}
-                  title={isSelf ? "Cannot revoke your own role" : undefined}
+                  title={isSelf ? t("members.cannotRevokeSelf") : undefined}
                   onClick={() => revokeMutation.mutate(a)}
                 >
                   ×
@@ -409,7 +409,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
       {canAssignRoles && (
         <>
           <Text size="sm" fw={600}>
-            Assign role
+            {t("members.assignRole")}
           </Text>
           {showGroups && (
             <SegmentedControl
@@ -417,8 +417,8 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
               value={subjectType}
               onChange={(v) => setSubjectType(v as "user" | "group")}
               data={[
-                { label: "User", value: "user" },
-                { label: "Group", value: "group" },
+                { label: t("members.subjectType.user"), value: "user" },
+                { label: t("members.subjectType.group"), value: "group" },
               ]}
             />
           )}
@@ -432,7 +432,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
             />
           ) : (
             <Select
-              placeholder="Select group"
+              placeholder={t("members.selectGroup")}
               data={groups?.map((g) => ({ value: g.id, label: g.name })) ?? []}
               value={groupSubject}
               onChange={setGroupSubject}
@@ -440,7 +440,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
             />
           )}
           <Select
-            placeholder="Role"
+            placeholder={t("members.rolePlaceholder")}
             data={ROLE_OPTIONS}
             value={role}
             onChange={setRole}
@@ -457,7 +457,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
             loading={assignMutation.isPending}
             disabled={(!email && !groupSubject) || !role}
           >
-            Assign
+            {t("members.assign")}
           </Button>
         </>
       )}
@@ -468,7 +468,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
     <Stack gap="sm">
       {groups?.length === 0 && (
         <Text size="sm" c="dimmed">
-          No groups yet.
+          {t("members.noGroups")}
         </Text>
       )}
       <Accordion chevronPosition="left" variant="separated">
@@ -480,7 +480,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                   {g.name}
                 </Text>
                 <Text size="xs" c="dimmed">
-                  {g.member_ids.length} member{g.member_ids.length !== 1 ? "s" : ""}
+                  {t("orgs.members", { count: g.member_ids.length })}
                 </Text>
               </Group>
             </Accordion.Control>
@@ -505,7 +505,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                       }}
                       label={
                         <Text size="xs" c="dimmed">
-                          Select all
+                          {t("members.selectAll")}
                         </Text>
                       }
                     />
@@ -514,7 +514,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                 {canManageGroup(g) && (groupMemberSelected[g.id]?.size ?? 0) > 0 && (
                   <Group gap="xs">
                     <Text size="xs" c="dimmed">
-                      {groupMemberSelected[g.id]?.size} selected
+                      {t("members.selected", { count: groupMemberSelected[g.id]?.size })}
                     </Text>
                     <Button
                       size="compact-xs"
@@ -528,7 +528,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                         })
                       }
                     >
-                      Remove selected
+                      {t("members.removeSelected")}
                     </Button>
                   </Group>
                 )}
@@ -560,7 +560,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                           {isSelf && (
                             <Text component="span" size="xs" c="dimmed">
                               {" "}
-                              (you)
+                              {t("members.you")}
                             </Text>
                           )}
                         </Text>
@@ -572,7 +572,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                           color="red"
                           loading={removeMemberMutation.isPending}
                           disabled={isSelf}
-                          title={isSelf ? "Cannot remove yourself from a group" : undefined}
+                          title={isSelf ? t("members.cannotRemoveSelf") : undefined}
                           onClick={() => removeMemberMutation.mutate({ gid: g.id, memberId: mid })}
                         >
                           ×
@@ -585,7 +585,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                   <>
                     <Group gap="xs" mt={4}>
                       <Autocomplete
-                        placeholder="Add by email"
+                        placeholder={t("members.addByEmail")}
                         data={users?.map((u) => u.email) ?? []}
                         value={groupMemberEmail[g.id] ?? ""}
                         onChange={(v) => setGroupMemberEmail((prev) => ({ ...prev, [g.id]: v }))}
@@ -604,7 +604,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                           setGroupMemberEmail((prev) => ({ ...prev, [g.id]: "" }));
                         }}
                       >
-                        Add
+                        {t("common.add")}
                       </Button>
                     </Group>
                     <Button
@@ -614,7 +614,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
                       loading={deleteGroupMutation.isPending}
                       onClick={() => deleteGroupMutation.mutate(g.id)}
                     >
-                      Delete group
+                      {t("members.deleteGroup")}
                     </Button>
                   </>
                 )}
@@ -628,11 +628,11 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
         <>
           <Divider mt="xs" />
           <Text size="sm" fw={600}>
-            New group
+            {t("members.newGroup")}
           </Text>
           <Group gap="xs">
             <TextInput
-              placeholder="Group name"
+              placeholder={t("members.groupNamePlaceholder")}
               value={groupName}
               onChange={(e) => setGroupName(e.currentTarget.value)}
               onKeyDown={(e) => e.key === "Enter" && groupName && createGroupMutation.mutate()}
@@ -645,7 +645,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
               loading={createGroupMutation.isPending}
               onClick={() => createGroupMutation.mutate()}
             >
-              Create
+              {t("common.create")}
             </Button>
           </Group>
         </>
@@ -657,7 +657,7 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
     <Drawer
       opened={opened}
       onClose={onClose}
-      title="Members & Roles"
+      title={t("members.title")}
       position="right"
       size="md"
       padding="md"
@@ -665,8 +665,8 @@ export function MembersDrawer({ orgId, scopeType, scopeId, opened, onClose, show
       {showGroups ? (
         <Tabs defaultValue="roles">
           <Tabs.List>
-            <Tabs.Tab value="roles">Roles</Tabs.Tab>
-            <Tabs.Tab value="groups">Groups</Tabs.Tab>
+            <Tabs.Tab value="roles">{t("members.tabRoles")}</Tabs.Tab>
+            <Tabs.Tab value="groups">{t("members.tabGroups")}</Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="roles" pt="md">
             {rolesContent}

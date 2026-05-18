@@ -16,6 +16,7 @@ import { ScopeSettingsModal } from "../components/ScopeSettingsModal";
 import { EditableTitle } from "../components/EditableTitle";
 import { useCanManageMembers, useMyRoles } from "../hooks/useMyRoles";
 import { getEffectiveRole, canManageMembers } from "../dto/permissions";
+import { useTranslation } from "react-i18next";
 
 export function CampaignPage() {
   const { campaignId } = useParams<{ campaignId: string }>();
@@ -54,6 +55,7 @@ export function CampaignPage() {
     enabled: !!subproject,
   });
 
+  const { t } = useTranslation();
   const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
   const canManageMembersOnScope = useCanManageMembers(orgId, "campaign", campaignId);
 
@@ -70,6 +72,7 @@ export function CampaignPage() {
   });
 
   const breadcrumbItems = buildBreadcrumbs(
+    t,
     orgId,
     org?.name,
     campaign,
@@ -110,12 +113,12 @@ export function CampaignPage() {
         <Group gap={6}>
           {canSettings && (
             <Button size="xs" variant="light" onClick={openSettings}>
-              Settings
+              {t("scopes.settings")}
             </Button>
           )}
           {canManageMembersOnScope && (
             <Button size="xs" variant="light" onClick={openMembers}>
-              Members
+              {t("scopes.members")}
             </Button>
           )}
         </Group>
@@ -154,6 +157,7 @@ export function CampaignPage() {
 }
 
 function buildBreadcrumbs(
+  t: (key: string) => string,
   orgId: string | undefined,
   orgName: string | undefined,
   campaign: { name: string; parent_type: string; parent_id: string } | undefined,
@@ -163,7 +167,7 @@ function buildBreadcrumbs(
 ) {
   const items: React.ReactNode[] = [
     <Anchor key="orgs" component={Link} to="/orgs" size="sm">
-      Organizations
+      {t("orgs.title")}
     </Anchor>,
     <Anchor key="org" component={Link} to={`/orgs/${orgId}`} size="sm">
       {orgName ?? "…"}

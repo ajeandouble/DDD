@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { SUPPORTED_LOCALES } from "../i18n";
 import {
   Stack,
   Title,
@@ -26,6 +28,8 @@ import {
   getSubprojects,
   getCampaigns,
   getMyRoles,
+  getMe,
+  updatePreferences,
 } from "../lib/api";
 import type { ApiKeyCreated } from "../dto/iam";
 import { canManageMembers, getEffectiveRole } from "../dto/permissions";
@@ -46,8 +50,19 @@ const ROLE_OPTIONS = [
 
 export function SettingsPage() {
   const qc = useQueryClient();
+  const { t, i18n } = useTranslation();
   const [createOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
   const [revealedKey, setRevealedKey] = useState<ApiKeyCreated | null>(null);
+
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
+
+  const localeMutation = useMutation({
+    mutationFn: (locale: string) => updatePreferences(locale),
+    onSuccess: (user) => {
+      qc.setQueryData(["me"], user);
+      i18n.changeLanguage(user.locale);
+    },
+  });
 
   const [name, setName] = useState("");
   const [scopeType, setScopeType] = useState<string | null>(null);
@@ -150,47 +165,63 @@ export function SettingsPage() {
 
   return (
     <Stack gap="lg" maw={800}>
-      <Title order={2}>Settings</Title>
+      <Title order={2}>{t("settings.title")}</Title>
+
+      <Stack gap="xs">
+        <Text fw={600} size="lg">
+          {t("settings.language")}
+        </Text>
+        <Text size="sm" c="dimmed">
+          {t("settings.languageDesc")}
+        </Text>
+        <Select
+          style={{ width: 200 }}
+          data={SUPPORTED_LOCALES}
+          value={me?.locale ?? i18n.language}
+          onChange={(v) => v && localeMutation.mutate(v)}
+        />
+      </Stack>
+
+      <Divider />
 
       <Stack gap="sm">
         <Group justify="space-between">
           <div>
             <Text fw={600} size="lg">
-              API Keys
+              {t("settings.apiKeys")}
             </Text>
             <Text size="sm" c="dimmed">
-              Keys let you authenticate API requests without a user session. Visible to supervisors
-              and admins.
+              {t("settings.apiKeysDesc")}
             </Text>
           </div>
           <Button
             size="sm"
             onClick={openCreate}
             disabled={!canCreateKey}
-            title={!canCreateKey ? "Requires supervisor or admin role" : undefined}
+            title={!canCreateKey ? t("settings.requiresSupervisor") : undefined}
           >
-            New key
+            {t("settings.newKey")}
           </Button>
         </Group>
 
         {isLoading && (
           <Text size="sm" c="dimmed">
-            Loading…
+            {t("settings.keyLoading")}
           </Text>
         )}
         {keys?.length === 0 && (
           <Text size="sm" c="dimmed">
-            No API keys yet.
+            {t("settings.noKeys")}
           </Text>
         )}
         {keys && keys.length > 0 && (
           <Table highlightOnHover withTableBorder withColumnBorders>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Name</Table.Th>
-                <Table.Th>Prefix</Table.Th>
-                <Table.Th>Scope</Table.Th>
-                <Table.Th>Created</Table.Th>
+                <Table.Th>{t("settings.table.name")}</Table.Th>
+                <Table.Th>{t("settings.table.prefix")}</Table.Th>
+                <Table.Th>{t("settings.table.scope")}</Table.Th>
+                <Table.Th>{t("settings.table.created")}</Table.Th>
                 <Table.Th />
               </Table.Tr>
             </Table.Thead>
@@ -208,7 +239,7 @@ export function SettingsPage() {
                       </Badge>
                     ) : (
                       <Text size="xs" c="dimmed">
-                        Unrestricted
+                        {t("settings.unrestricted")}
                       </Text>
                     )}
                   </Table.Td>
@@ -225,7 +256,7 @@ export function SettingsPage() {
                       loading={deleteMutation.isPending}
                       onClick={() => deleteMutation.mutate(k.id)}
                     >
-                      Delete
+                      {t("common.delete")}
                     </Button>
                   </Table.Td>
                 </Table.Tr>
@@ -242,21 +273,21 @@ export function SettingsPage() {
           closeCreate();
           resetForm();
         }}
-        title="New API Key"
+        title={t("settings.newKeyModal")}
         size="md"
       >
         <Stack gap="sm">
           <TextInput
-            label="Name"
+            label={t("common.name")}
             placeholder="My integration key"
             value={name}
             onChange={(e) => setName(e.currentTarget.value)}
             required
           />
-          <Divider label="Scope restriction (optional)" labelPosition="left" />
+          <Divider label={t("settings.scopeRestriction")} labelPosition="left" />
           <Select
-            label="Scope type"
-            placeholder="Unrestricted (all scopes)"
+            label={t("settings.scopeType")}
+            placeholder={t("settings.scopeTypePlaceholder")}
             data={SCOPE_TYPES}
             value={scopeType}
             onChange={(v) => {
@@ -270,8 +301,8 @@ export function SettingsPage() {
           />
           {scopeType && (
             <Select
-              label="Organization"
-              placeholder="Select org"
+              label={t("orgs.title")}
+              placeholder={t("settings.selectOrg")}
               data={orgs?.map((o) => ({ value: o.id, label: o.name })) ?? []}
               value={selectedOrgId}
               onChange={(v) => {
@@ -286,8 +317,8 @@ export function SettingsPage() {
           {(scopeType === "project" || scopeType === "subproject" || scopeType === "campaign") &&
             selectedOrgId && (
               <Select
-                label="Project"
-                placeholder="Select project"
+                label={t("projects.title")}
+                placeholder={t("settings.selectProject")}
                 data={projects?.map((p) => ({ value: p.id, label: p.name })) ?? []}
                 value={selectedProjectId}
                 onChange={(v) => {
@@ -300,8 +331,8 @@ export function SettingsPage() {
             )}
           {(scopeType === "subproject" || scopeType === "campaign") && selectedProjectId && (
             <Select
-              label="Subproject"
-              placeholder="Select subproject"
+              label={t("subprojects.title")}
+              placeholder={t("settings.selectSubproject")}
               data={subprojects?.map((s) => ({ value: s.id, label: s.name })) ?? []}
               value={selectedSubprojectId}
               onChange={(v) => {
@@ -313,8 +344,8 @@ export function SettingsPage() {
           )}
           {scopeType === "campaign" && selectedSubprojectId && (
             <Select
-              label="Campaign"
-              placeholder="Select campaign"
+              label={t("scopeTypes.campaign")}
+              placeholder={t("settings.selectCampaign")}
               data={campaigns?.map((c) => ({ value: c.id, label: c.name })) ?? []}
               value={selectedCampaignId}
               onChange={setSelectedCampaignId}
@@ -323,8 +354,8 @@ export function SettingsPage() {
           )}
           {scopeType && (
             <Select
-              label="Role at this scope"
-              placeholder="Select role"
+              label={t("settings.roleAtScope")}
+              placeholder={t("settings.selectRole")}
               data={ROLE_OPTIONS}
               value={role}
               onChange={setRole}
@@ -336,7 +367,7 @@ export function SettingsPage() {
             disabled={!name}
             mt="xs"
           >
-            Generate key
+            {t("settings.generateKey")}
           </Button>
         </Stack>
       </Modal>
@@ -345,12 +376,12 @@ export function SettingsPage() {
       <Modal
         opened={!!revealedKey}
         onClose={() => setRevealedKey(null)}
-        title="API Key Created"
+        title={t("settings.keyCreatedTitle")}
         size="md"
       >
         <Stack gap="sm">
-          <Alert color="yellow" title="Save this key now">
-            This is the only time the full key will be shown. It cannot be recovered.
+          <Alert color="yellow" title={t("settings.saveKeyNow")}>
+            {t("settings.saveKeyDesc")}
           </Alert>
           <Code block style={{ wordBreak: "break-all", fontSize: 13 }}>
             {revealedKey?.raw_key}
@@ -358,12 +389,12 @@ export function SettingsPage() {
           <CopyButton value={revealedKey?.raw_key ?? ""} timeout={2000}>
             {({ copied, copy }) => (
               <Button color={copied ? "teal" : "blue"} onClick={copy}>
-                {copied ? "Copied!" : "Copy to clipboard"}
+                {copied ? t("settings.copied") : t("settings.copyToClipboard")}
               </Button>
             )}
           </CopyButton>
           <Text size="xs" c="dimmed">
-            Use this key in the <Code>Authorization: Bearer &lt;key&gt;</Code> header.
+            {t("settings.keyUsageHint")}
           </Text>
         </Stack>
       </Modal>

@@ -18,6 +18,7 @@ def _user_to_doc(user: User) -> dict:
         "_id": user.id,
         "email": user.email,
         "password_hash": user.password_hash,
+        "locale": user.locale,
         "created_at": user.created_at,
     }
 
@@ -27,6 +28,7 @@ def _user_from_doc(doc: dict) -> User:
         id=doc["_id"],
         email=doc["email"],
         password_hash=doc["password_hash"],
+        locale=doc.get("locale", "en"),
         created_at=doc["created_at"],
     )
 
@@ -44,6 +46,11 @@ class MongoUserRepository(MongoRepository, UserRepository):
     async def find_by_id(self, user_id: UUID) -> User | None:
         doc = await self._col.find_one({"_id": user_id})
         return _user_from_doc(doc) if doc else None
+
+    async def update(self, user: User) -> None:
+        doc = _user_to_doc(user)
+        doc.pop("_id")
+        await self._col.update_one({"_id": user.id}, {"$set": doc})
 
 
 # ---------------------------------------------------------------------------

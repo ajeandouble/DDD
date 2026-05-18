@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { login, register } from "../lib/api";
 import type { TokenResponse } from "../dto/auth";
 import styles from "./LoginPage.module.css";
+import { useTranslation } from "react-i18next";
 
 type Mode = "login" | "register";
 
@@ -13,6 +14,7 @@ const authenticate = (mode: Mode, email: string, password: string): Promise<Toke
 export function LoginPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,15 +36,17 @@ export function LoginPage() {
   return (
     <div className={styles.root}>
       <div className={styles.card}>
-        <h1 className={styles.title}>{mode === "login" ? "Sign in" : "Create account"}</h1>
+        <h1 className={styles.title}>
+          {mode === "login" ? t("auth.signIn") : t("auth.createAccount")}
+        </h1>
         <p className={styles.subtitle}>
-          {mode === "login" ? "Welcome back." : "Get started for free."}
+          {mode === "login" ? t("auth.welcomeBack") : t("auth.getStarted")}
         </p>
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="email">
-              Email
+              {t("auth.email")}
             </label>
             <input
               id="email"
@@ -57,7 +61,7 @@ export function LoginPage() {
 
           <div className={styles.field}>
             <label className={styles.label} htmlFor="password">
-              Password
+              {t("auth.password")}
             </label>
             <input
               id="password"
@@ -71,19 +75,23 @@ export function LoginPage() {
           </div>
 
           <button className={styles.button} type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? "Please wait…" : mode === "login" ? "Sign in" : "Register"}
+            {mutation.isPending
+              ? t("auth.pleaseWait")
+              : mode === "login"
+                ? t("auth.signIn")
+                : t("auth.register")}
           </button>
         </form>
 
         <div className={styles.toggle}>
-          {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
+          {mode === "login" ? t("auth.noAccount") : t("auth.alreadyAccount")}{" "}
           <button
             onClick={() => {
               setMode(mode === "login" ? "register" : "login");
               mutation.reset();
             }}
           >
-            {mode === "login" ? "Register" : "Sign in"}
+            {mode === "login" ? t("auth.register") : t("auth.signIn")}
           </button>
         </div>
       </div>

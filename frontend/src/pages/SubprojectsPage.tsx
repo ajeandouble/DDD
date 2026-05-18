@@ -30,6 +30,7 @@ import { ScopeCard } from "../components/ScopeCard";
 import { ScopeSettingsModal } from "../components/ScopeSettingsModal";
 import { EditableTitle } from "../components/EditableTitle";
 import { useCanManageMembers } from "../hooks/useMyRoles";
+import { useTranslation } from "react-i18next";
 
 export function SubprojectsPage() {
   const { orgId, projectId } = useParams<{ orgId: string; projectId: string }>();
@@ -42,6 +43,7 @@ export function SubprojectsPage() {
   const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
   const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
   const canManageMembersOnScope = useCanManageMembers(orgId, "project", projectId);
+  const { t } = useTranslation();
   const [subprojectName, setSubprojectName] = useState("");
   const [campaignName, setCampaignName] = useState("");
 
@@ -106,13 +108,13 @@ export function SubprojectsPage() {
       <Modal
         opened={subprojectModalOpened}
         onClose={closeSubprojectModal}
-        title="New subproject"
+        title={t("subprojects.modalTitle")}
         centered
       >
         <Stack>
           <TextInput
-            label="Name"
-            placeholder="Phase 1"
+            label={t("common.name")}
+            placeholder={t("subprojects.namePlaceholder")}
             value={subprojectName}
             onChange={(e) => setSubprojectName(e.currentTarget.value)}
             onKeyDown={(e) => e.key === "Enter" && createSubprojectMutation.mutate()}
@@ -125,13 +127,13 @@ export function SubprojectsPage() {
           )}
           <Group justify="flex-end">
             <Button variant="default" onClick={closeSubprojectModal}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => createSubprojectMutation.mutate()}
               loading={createSubprojectMutation.isPending}
             >
-              Create
+              {t("common.create")}
             </Button>
           </Group>
         </Stack>
@@ -140,13 +142,13 @@ export function SubprojectsPage() {
       <Modal
         opened={campaignModalOpened}
         onClose={closeCampaignModal}
-        title="New campaign"
+        title={t("campaigns.modalTitle")}
         centered
       >
         <Stack>
           <TextInput
-            label="Name"
-            placeholder="Email blast Jan 2025"
+            label={t("common.name")}
+            placeholder={t("campaigns.namePlaceholder")}
             value={campaignName}
             onChange={(e) => setCampaignName(e.currentTarget.value)}
             onKeyDown={(e) => e.key === "Enter" && createCampaignMutation.mutate()}
@@ -159,13 +161,13 @@ export function SubprojectsPage() {
           )}
           <Group justify="flex-end">
             <Button variant="default" onClick={closeCampaignModal}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => createCampaignMutation.mutate()}
               loading={createCampaignMutation.isPending}
             >
-              Create
+              {t("common.create")}
             </Button>
           </Group>
         </Stack>
@@ -183,7 +185,7 @@ export function SubprojectsPage() {
       <Stack gap="lg">
         <Breadcrumbs>
           <Anchor component={Link} to="/orgs" size="sm">
-            Organizations
+            {t("orgs.title")}
           </Anchor>
           <Anchor component={Link} to={`/orgs/${orgId}`} size="sm">
             {org?.name ?? orgId}
@@ -217,12 +219,12 @@ export function SubprojectsPage() {
           <Group gap={6}>
             {canManageMembersOnScope && (
               <Button size="xs" variant="light" onClick={openSettings}>
-                Settings
+                {t("scopes.settings")}
               </Button>
             )}
             {canManageMembersOnScope && (
               <Button size="xs" variant="light" onClick={openMembers}>
-                Members
+                {t("scopes.members")}
               </Button>
             )}
           </Group>
@@ -239,16 +241,16 @@ export function SubprojectsPage() {
 
         {/* Direct campaigns under this project */}
         <Group justify="space-between" mt="sm">
-          <Text fw={600}>Campaigns</Text>
+          <Text fw={600}>{t("projects.campaigns")}</Text>
           <Button size="xs" onClick={openCampaignModal}>
-            New campaign
+            {t("campaigns.new")}
           </Button>
         </Group>
 
         {campaignsLoading && <Loader size="sm" />}
         {campaigns?.length === 0 && (
           <Text c="dimmed" size="sm">
-            No campaigns yet.
+            {t("campaigns.noCampaigns")}
           </Text>
         )}
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
@@ -264,9 +266,9 @@ export function SubprojectsPage() {
 
         {/* Subprojects */}
         <Group justify="space-between" mt="sm">
-          <Text fw={600}>Subprojects</Text>
+          <Text fw={600}>{t("subprojects.title")}</Text>
           <Button size="xs" onClick={openSubprojectModal}>
-            New subproject
+            {t("subprojects.new")}
           </Button>
         </Group>
 
@@ -274,7 +276,7 @@ export function SubprojectsPage() {
         {subprojectsError && <Alert color="red">{String(subprojectsError)}</Alert>}
         {subprojects?.length === 0 && (
           <Text c="dimmed" size="sm">
-            No subprojects yet.
+            {t("subprojects.noSubprojects")}
           </Text>
         )}
 

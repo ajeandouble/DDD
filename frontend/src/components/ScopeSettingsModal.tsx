@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Modal, Stack, Text, Group, Button, Tooltip, useMantineColorScheme } from "@mantine/core";
+import { useTranslation } from "react-i18next";
 
 export const SCOPE_COLORS: { value: string; label: string }[] = [
   { value: "#ef4444", label: "Red" },
@@ -27,6 +28,7 @@ function ColorPalette({
   value: string | null;
   onChange: (c: string | null) => void;
 }) {
+  const { t } = useTranslation();
   const { colorScheme } = useMantineColorScheme();
   const isDark = colorScheme === "dark";
 
@@ -35,7 +37,7 @@ function ColorPalette({
       {SCOPE_COLORS.map((c) => {
         const selected = value === c.value;
         return (
-          <Tooltip key={c.value} label={c.label} withArrow>
+          <Tooltip key={c.value} label={t(`scopes.colors.${c.label.toLowerCase()}`)} withArrow>
             <div
               onClick={() => onChange(selected ? null : c.value)}
               style={{
@@ -78,6 +80,7 @@ export function ScopeSettingsModal({
   isPending,
   error,
 }: Props) {
+  const { t } = useTranslation();
   const [selectedColor, setSelectedColor] = useState<string | null>(currentColor ?? null);
 
   useEffect(() => {
@@ -85,13 +88,19 @@ export function ScopeSettingsModal({
   }, [opened]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Scope settings" centered size="sm">
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title={t("scopes.scopeSettingsTitle")}
+      centered
+      size="sm"
+    >
       <Stack>
         <Text size="sm" fw={500}>
-          Colour
+          {t("scopes.colorLabel")}
         </Text>
         <Text size="xs" c="dimmed">
-          Click a colour to apply it; click again to remove it.
+          {t("scopes.colorHint")}
         </Text>
         <ColorPalette value={selectedColor} onChange={setSelectedColor} />
         {error != null && (
@@ -101,10 +110,10 @@ export function ScopeSettingsModal({
         )}
         <Group justify="flex-end" mt="xs">
           <Button variant="default" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={() => onSave(selectedColor)} loading={isPending}>
-            Save
+            {t("common.save")}
           </Button>
         </Group>
       </Stack>

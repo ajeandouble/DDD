@@ -21,6 +21,7 @@ import {
 import { useDisclosure } from "@mantine/hooks";
 import { getSubscription, upgradeSubscription, getUsage } from "../lib/api";
 import { useMyRoles } from "../hooks/useMyRoles";
+import { useTranslation } from "react-i18next";
 
 const PLANS = [
   {
@@ -55,6 +56,7 @@ const PLANS = [
 export function BillingPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const qc = useQueryClient();
+  const { t } = useTranslation();
   const [pendingTier, setPendingTier] = useState<string | null>(null);
   const [paymentOpen, { open: openPayment, close: closePayment }] = useDisclosure(false);
 
@@ -104,26 +106,27 @@ export function BillingPage() {
 
   return (
     <Stack gap="lg" maw={860}>
-      <Title order={2}>Billing</Title>
+      <Title order={2}>{t("billing.title")}</Title>
 
       {subscription && (
         <Card withBorder radius="md" p="md">
           <Group justify="space-between" mb="xs">
             <Text fw={600} size="lg">
-              Current plan
+              {t("billing.currentPlan")}
             </Text>
             <Badge size="lg" variant="filled" color={currentPlan?.color ?? "gray"}>
-              {currentPlan?.label ?? subscription.tier}
+              {subscription.tier ? t(`billing.plans.${subscription.tier}`) : subscription.tier}
             </Badge>
           </Group>
           {subscription.tokens_remaining != null ? (
             <>
               <Group justify="space-between" mb={4}>
                 <Text size="sm" c="dimmed">
-                  Token usage
+                  {t("billing.tokenUsage")}
                 </Text>
                 <Text size="sm">
-                  {subscription.tokens_used.toLocaleString()} / {tokenLimit?.toLocaleString()} used
+                  {subscription.tokens_used.toLocaleString()} / {tokenLimit?.toLocaleString()}{" "}
+                  {t("billing.tokensUsed")}
                 </Text>
               </Group>
               <Progress
@@ -135,12 +138,11 @@ export function BillingPage() {
             </>
           ) : (
             <Text size="sm" c="dimmed" mb="xs">
-              Unlimited token usage
+              {t("billing.unlimited")}
             </Text>
           )}
           <Text size="xs" c="dimmed">
-            Resets{" "}
-            {new Date(subscription.reset_at).toLocaleDateString("en-GB", {
+            {new Date(subscription.reset_at).toLocaleDateString(undefined, {
               day: "numeric",
               month: "long",
               year: "numeric",
@@ -151,16 +153,29 @@ export function BillingPage() {
 
       <div>
         <Group justify="space-between" mb="sm">
-          <Text fw={600}>Plans</Text>
+          <Text fw={600}>{t("billing.plansTitle")}</Text>
           {!isAdmin && (
             <Text size="xs" c="dimmed">
-              Plan changes require admin access.
+              {t("billing.adminRequired")}
             </Text>
           )}
         </Group>
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
           {PLANS.map((plan) => {
             const isCurrent = subscription?.tier === plan.tier;
+            const tierLabel = t(`billing.plans.${plan.tier}`);
+            const tierPrice =
+              plan.tier === "starter"
+                ? t("billing.plans.free")
+                : plan.tier === "enterprise"
+                  ? t("billing.custom")
+                  : plan.price;
+            const tierTokens =
+              plan.tier === "starter"
+                ? t("billing.starterTokens")
+                : plan.tier === "pro"
+                  ? t("billing.proTokens")
+                  : t("billing.unlimited");
             return (
               <Card key={plan.tier} withBorder radius="md" p="md" style={{ position: "relative" }}>
                 {isCurrent && (
@@ -170,19 +185,19 @@ export function BillingPage() {
                     color="green"
                     style={{ position: "absolute", top: 12, right: 12 }}
                   >
-                    Current
+                    {t("billing.current")}
                   </Badge>
                 )}
                 <Text fw={700} size="lg" mb={4}>
-                  {plan.label}
+                  {tierLabel}
                 </Text>
                 <Text size="xl" fw={800} c={plan.color} mb="sm">
-                  {plan.price}
+                  {tierPrice}
                 </Text>
                 <Stack gap={4} mb="md">
-                  <Text size="sm">{plan.tokens}</Text>
+                  <Text size="sm">{tierTokens}</Text>
                   <Text size="sm" c={plan.webhooks ? undefined : "dimmed"}>
-                    {plan.webhooks ? "✓ Webhooks" : "✗ No webhooks"}
+                    {plan.webhooks ? t("billing.webhooksIncluded") : t("billing.webhooksExcluded")}
                   </Text>
                 </Stack>
                 {isAdmin && !isCurrent && (
@@ -200,10 +215,10 @@ export function BillingPage() {
                     onClick={() => handleSelectPlan(plan.tier)}
                   >
                     {plan.tier === "starter"
-                      ? "Downgrade to Free"
+                      ? t("billing.downgradeFree")
                       : plan.tier === "enterprise"
-                        ? "Upgrade to Enterprise"
-                        : "Upgrade to Pro"}
+                        ? t("billing.upgradeToEnterprise")
+                        : t("billing.upgradeToPro")}
                   </Button>
                 )}
               </Card>
@@ -219,22 +234,22 @@ export function BillingPage() {
 
       <div>
         <Text fw={600} mb="sm">
-          Usage history
+          {t("billing.usageHistory")}
         </Text>
         {usageLoading && <Loader size="sm" />}
         {!usageLoading && usage?.length === 0 && (
           <Text size="sm" c="dimmed">
-            No usage records yet. Records appear after audio is transcribed.
+            {t("billing.noUsage")}
           </Text>
         )}
         {usage && usage.length > 0 && (
           <Table withTableBorder withColumnBorders highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Date</Table.Th>
-                <Table.Th>Conversation</Table.Th>
-                <Table.Th>Duration</Table.Th>
-                <Table.Th>Tokens</Table.Th>
+                <Table.Th>{t("billing.date")}</Table.Th>
+                <Table.Th>{t("billing.conversation")}</Table.Th>
+                <Table.Th>{t("billing.duration")}</Table.Th>
+                <Table.Th>{t("billing.tokens")}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -292,6 +307,7 @@ function FakePaymentModal({
   onConfirm: (tier: string) => void;
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
   const [expiry, setExpiry] = useState("12/28");
   const [cvc, setCvc] = useState("123");
@@ -303,44 +319,44 @@ function FakePaymentModal({
     <Modal
       opened={opened}
       onClose={onClose}
-      title={`Upgrade to ${plan?.label ?? tier}`}
+      title={tier ? t(`billing.plans.${tier}`) : ""}
       size="sm"
       centered
     >
       <Stack gap="sm">
         <Alert color="blue" variant="light">
-          Simulated payment — no real charge will occur.
+          {t("billing.simPaymentInfo")}
         </Alert>
         <TextInput
-          label="Card number"
+          label={t("billing.cardNumber")}
           value={cardNumber}
           onChange={(e) => setCardNumber(e.currentTarget.value)}
           styles={{ input: { fontFamily: "monospace" } }}
         />
         <Group grow>
           <TextInput
-            label="Expiry"
+            label={t("billing.expiry")}
             value={expiry}
             onChange={(e) => setExpiry(e.currentTarget.value)}
           />
           <TextInput label="CVC" value={cvc} onChange={(e) => setCvc(e.currentTarget.value)} />
         </Group>
         <TextInput
-          label="Name on card"
+          label={t("billing.nameOnCard")}
           value={name}
           onChange={(e) => setName(e.currentTarget.value)}
         />
         <Divider />
         <Group justify="space-between">
           <Text size="sm" c="dimmed">
-            Total: <strong>{plan?.price}</strong>
+            <strong>{plan?.price}</strong>
           </Text>
           <Group gap="xs">
             <Button variant="default" size="xs" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button size="xs" loading={loading} onClick={() => tier && onConfirm(tier)}>
-              Pay {plan?.price}
+              {t("billing.pay")} {plan?.price}
             </Button>
           </Group>
         </Group>

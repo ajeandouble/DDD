@@ -31,6 +31,7 @@ import {
 } from "../lib/api";
 import { AudioTranscriptPlayer } from "../components/AudioTranscriptPlayer";
 import type { SpeakerTurn } from "../dto/conversations";
+import { useTranslation } from "react-i18next";
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -43,6 +44,7 @@ export function ConversationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const { t } = useTranslation();
   const [editOpened, { open: openEdit, close: closeEdit }] = useDisclosure(false);
   const [deleteOpened, { open: openDelete, close: closeDelete }] = useDisclosure(false);
   const [editTitle, setEditTitle] = useState("");
@@ -128,20 +130,26 @@ export function ConversationPage() {
   return (
     <>
       {/* Edit modal */}
-      <Modal opened={editOpened} onClose={closeEdit} title="Edit conversation" centered size="md">
+      <Modal
+        opened={editOpened}
+        onClose={closeEdit}
+        title={t("conversation.editTitle")}
+        centered
+        size="md"
+      >
         <Stack>
           <TextInput
-            label="Title"
+            label={t("conversations.titleLabel")}
             value={editTitle}
             onChange={(e) => setEditTitle(e.currentTarget.value)}
             data-autofocus
           />
           <MultiSelect
-            label="Tags"
+            label={t("conversations.tagsLabel")}
             data={tagOptions}
             value={editTagIds}
             onChange={setEditTagIds}
-            placeholder="Select tags…"
+            placeholder={t("conversations.selectTagsPlaceholder")}
             searchable
             clearable
           />
@@ -163,7 +171,7 @@ export function ConversationPage() {
               disabled={!newTagName.trim()}
               loading={createTagMutation.isPending}
             >
-              Add tag
+              {t("conversations.addTagLabel")}
             </Button>
           </Group>
           {updateMutation.isError && (
@@ -173,10 +181,10 @@ export function ConversationPage() {
           )}
           <Group justify="flex-end">
             <Button variant="default" onClick={closeEdit}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={() => updateMutation.mutate()} loading={updateMutation.isPending}>
-              Save
+              {t("common.save")}
             </Button>
           </Group>
         </Stack>
@@ -186,15 +194,17 @@ export function ConversationPage() {
       <Modal
         opened={deleteOpened}
         onClose={closeDelete}
-        title="Delete conversation?"
+        title={t("conversation.deleteTitle")}
         centered
         size="sm"
       >
         <Stack>
-          <Text size="sm">
-            This will permanently delete <strong>{conv.title}</strong>. This action cannot be
-            undone.
-          </Text>
+          <Text
+            size="sm"
+            dangerouslySetInnerHTML={{
+              __html: t("conversation.deleteConfirm", { title: `<strong>${conv.title}</strong>` }),
+            }}
+          />
           {deleteMutation.isError && (
             <Text size="sm" c="red">
               {String(deleteMutation.error)}
@@ -202,14 +212,14 @@ export function ConversationPage() {
           )}
           <Group justify="flex-end">
             <Button variant="default" onClick={closeDelete}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               color="red"
               onClick={() => deleteMutation.mutate()}
               loading={deleteMutation.isPending}
             >
-              Delete
+              {t("common.delete")}
             </Button>
           </Group>
         </Stack>
@@ -217,7 +227,7 @@ export function ConversationPage() {
 
       <Stack gap="md">
         <Group gap="xs">
-          <Tooltip label="Back">
+          <Tooltip label={t("conversation.backTooltip")}>
             <ActionIcon variant="subtle" onClick={() => navigate(-1)}>
               <IconArrowLeft size={18} />
             </ActionIcon>
@@ -225,12 +235,12 @@ export function ConversationPage() {
           <Title order={3} style={{ flex: 1 }}>
             {conv.title}
           </Title>
-          <Tooltip label="Edit">
+          <Tooltip label={t("conversation.editTooltip")}>
             <ActionIcon variant="subtle" onClick={openEditModal}>
               <IconEdit size={16} />
             </ActionIcon>
           </Tooltip>
-          <Tooltip label="Delete">
+          <Tooltip label={t("conversation.deleteTooltip")}>
             <ActionIcon variant="subtle" color="red" onClick={openDelete}>
               <IconTrash size={16} />
             </ActionIcon>
@@ -248,12 +258,12 @@ export function ConversationPage() {
           )}
           {conv.stats.word_count != null && (
             <Badge size="xs" variant="outline">
-              {conv.stats.word_count} words
+              {t("conversations.wordCount", { count: conv.stats.word_count })}
             </Badge>
           )}
           {isTranscribing && (
             <Badge size="xs" color="yellow" variant="dot">
-              Transcribing…
+              {t("conversations.transcribing")}
             </Badge>
           )}
         </Group>
@@ -277,7 +287,7 @@ export function ConversationPage() {
         ) : turns ? (
           <Stack gap="md">
             <Text size="sm" c="dimmed" fw={600}>
-              TRANSCRIPT
+              {t("conversations.transcriptTitle")}
             </Text>
             {turns.map((t, i) => (
               <Paper key={i} withBorder p="sm" radius="sm">
@@ -290,7 +300,7 @@ export function ConversationPage() {
           </Stack>
         ) : isTranscribing ? (
           <Text size="sm" c="dimmed">
-            Transcription in progress…
+            {t("conversation.pendingTranscript")}
           </Text>
         ) : typeof conv.content === "string" && conv.content ? (
           <Paper withBorder p="md" radius="sm">
@@ -300,7 +310,7 @@ export function ConversationPage() {
           </Paper>
         ) : (
           <Text size="sm" c="dimmed">
-            No content yet.
+            {t("conversation.noContent")}
           </Text>
         )}
       </Stack>

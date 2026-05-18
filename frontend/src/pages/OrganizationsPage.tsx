@@ -15,11 +15,13 @@ import {
   Alert,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
+import { useTranslation } from "react-i18next";
 import { getOrganizations, createOrganization } from "../lib/api";
 
 export function OrganizationsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [opened, { open, close }] = useDisclosure(false);
   const [name, setName] = useState("");
 
@@ -41,11 +43,11 @@ export function OrganizationsPage() {
 
   return (
     <>
-      <Modal opened={opened} onClose={close} title="New organization" centered>
+      <Modal opened={opened} onClose={close} title={t("orgs.modalTitle")} centered>
         <Stack>
           <TextInput
-            label="Name"
-            placeholder="Acme Corp"
+            label={t("common.name")}
+            placeholder={t("orgs.namePlaceholder")}
             value={name}
             onChange={(e) => setName(e.currentTarget.value)}
             onKeyDown={(e) => e.key === "Enter" && createMutation.mutate()}
@@ -58,10 +60,10 @@ export function OrganizationsPage() {
           )}
           <Group justify="flex-end">
             <Button variant="default" onClick={close}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
-              Create
+              {t("common.create")}
             </Button>
           </Group>
         </Stack>
@@ -69,15 +71,13 @@ export function OrganizationsPage() {
 
       <Stack gap="lg">
         <Group justify="space-between">
-          <Title order={2}>Organizations</Title>
-          <Button onClick={open}>New organization</Button>
+          <Title order={2}>{t("orgs.title")}</Title>
+          <Button onClick={open}>{t("orgs.new")}</Button>
         </Group>
 
         {isLoading && <Loader />}
         {error && <Alert color="red">{String(error)}</Alert>}
-        {data?.length === 0 && (
-          <Text c="dimmed">No organizations yet — create one or ask to be added to one.</Text>
-        )}
+        {data?.length === 0 && <Text c="dimmed">{t("orgs.noOrgs")}</Text>}
 
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
           {data?.map((org) => (
@@ -94,7 +94,7 @@ export function OrganizationsPage() {
                 {org.name}
               </Text>
               <Text size="sm" c="dimmed" mt={4}>
-                {org.member_ids.length} member{org.member_ids.length !== 1 ? "s" : ""}
+                {t("orgs.members", { count: org.member_ids.length })}
               </Text>
             </Card>
           ))}

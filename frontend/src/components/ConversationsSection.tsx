@@ -41,6 +41,7 @@ import type { ConvFilter, FilterField, FilterOp } from "../lib/api";
 import type { ConversationResponse } from "../dto/conversations";
 import { useMyRoles } from "../hooks/useMyRoles";
 import { canWrite } from "../dto/permissions";
+import { useTranslation } from "react-i18next";
 
 const PAGE_SIZE_OPTIONS = ["25", "50", "100"];
 const PREFS_KEY = "conv_prefs";
@@ -75,27 +76,7 @@ type MetaRow = { key: string; value: string };
 
 // ---- Filter panel ----
 
-const FIELD_OPTIONS = [
-  { value: "title", label: "Title" },
-  { value: "content", label: "Content" },
-  { value: "meta", label: "Metadata" },
-  { value: "stats.word_count", label: "Word count" },
-  { value: "stats.duration_seconds", label: "Duration (s)" },
-];
-
-const STRING_OPS = [
-  { value: "eq", label: "==" },
-  { value: "contains", label: "contains" },
-  { value: "regex", label: "regex" },
-];
-
-const NUM_OPS = [
-  { value: "eq", label: "==" },
-  { value: "gt", label: ">" },
-  { value: "gte", label: ">=" },
-  { value: "lt", label: "<" },
-  { value: "lte", label: "<=" },
-];
+// Field/op options are built inside FilterRow to pick up live translations
 
 function isNumericField(f: FilterField) {
   return f === "stats.word_count" || f === "stats.duration_seconds";
@@ -110,13 +91,33 @@ function FilterRow({
   onChange: (f: ConvFilter) => void;
   onRemove: () => void;
 }) {
-  const ops = isNumericField(filter.field) ? NUM_OPS : STRING_OPS;
+  const { t } = useTranslation();
+  const fieldOptions = [
+    { value: "title", label: t("conversations.filterFields.title") },
+    { value: "content", label: t("conversations.filterFields.content") },
+    { value: "meta", label: t("conversations.filterFields.meta") },
+    { value: "stats.word_count", label: t("conversations.filterFields.wordCount") },
+    { value: "stats.duration_seconds", label: t("conversations.filterFields.duration") },
+  ];
+  const stringOps = [
+    { value: "eq", label: "==" },
+    { value: "contains", label: "contains" },
+    { value: "regex", label: "regex" },
+  ];
+  const numOps = [
+    { value: "eq", label: "==" },
+    { value: "gt", label: ">" },
+    { value: "gte", label: ">=" },
+    { value: "lt", label: "<" },
+    { value: "lte", label: "<=" },
+  ];
+  const ops = isNumericField(filter.field) ? numOps : stringOps;
   return (
     <Group gap={6} wrap="nowrap" align="flex-end">
       <Select
         size="xs"
         style={{ width: 140 }}
-        data={FIELD_OPTIONS}
+        data={fieldOptions}
         value={filter.field}
         onChange={(v) =>
           onChange({ ...filter, field: v as FilterField, op: "eq", value: "", meta_key: "" })
@@ -169,6 +170,7 @@ function FilterPanel({
   onApply: () => void;
   onClear: () => void;
 }) {
+  const { t } = useTranslation();
   const add = () =>
     onChange([...value, { field: "content", op: "contains", value: "", meta_key: "" }]);
   const update = (i: number, f: ConvFilter) => onChange(value.map((r, idx) => (idx === i ? f : r)));
@@ -180,7 +182,7 @@ function FilterPanel({
         {tagOptions.length > 0 && (
           <MultiSelect
             size="xs"
-            placeholder="Filter by tag…"
+            placeholder={t("conversations.filterByTag")}
             data={tagOptions}
             value={draftTagIds}
             onChange={onTagIdsChange}
@@ -197,14 +199,14 @@ function FilterPanel({
         ))}
         <Group justify="space-between">
           <Button size="xs" variant="subtle" leftSection={<IconPlus size={13} />} onClick={add}>
-            Add filter
+            {t("conversations.addFilter")}
           </Button>
           <Group gap={6}>
             <Button size="xs" variant="subtle" color="dimmed" onClick={onClear}>
-              Clear
+              {t("common.clear")}
             </Button>
             <Button size="xs" onClick={onApply} leftSection={<IconSearch size={13} />}>
-              Search
+              {t("common.search")}
             </Button>
           </Group>
         </Group>
@@ -220,6 +222,7 @@ function MetadataEditor({
   value: MetaRow[];
   onChange: (v: MetaRow[]) => void;
 }) {
+  const { t } = useTranslation();
   const add = () => onChange([...value, { key: "", value: "" }]);
   const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
   const set = (i: number, field: "key" | "value", v: string) =>
@@ -229,7 +232,7 @@ function MetadataEditor({
     <Stack gap={6}>
       <Group justify="space-between">
         <Text size="sm" fw={500}>
-          Metadata
+          {t("conversations.metadataLabel")}
         </Text>
         <ActionIcon size="xs" variant="subtle" onClick={add}>
           <IconPlus size={14} />
@@ -238,14 +241,14 @@ function MetadataEditor({
       {value.map((row, i) => (
         <Group key={i} gap={6} wrap="nowrap">
           <TextInput
-            placeholder="key"
+            placeholder={t("conversations.metaKey")}
             value={row.key}
             onChange={(e) => set(i, "key", e.currentTarget.value)}
             style={{ flex: 1 }}
             size="xs"
           />
           <TextInput
-            placeholder="value"
+            placeholder={t("conversations.metaValue")}
             value={row.value}
             onChange={(e) => set(i, "value", e.currentTarget.value)}
             style={{ flex: 2 }}
@@ -258,7 +261,7 @@ function MetadataEditor({
       ))}
       {value.length === 0 && (
         <Text size="xs" c="dimmed">
-          No metadata — click + to add a key/value pair.
+          {t("conversations.noMetadata")}
         </Text>
       )}
     </Stack>
@@ -274,6 +277,7 @@ function SpeakerTurnsEditor({
   value: TurnRow[];
   onChange: (v: TurnRow[]) => void;
 }) {
+  const { t } = useTranslation();
   const add = () => {
     const last = value[value.length - 1];
     const nextSpeaker = last?.speaker === "Speaker A" ? "Speaker B" : "Speaker A";
@@ -309,7 +313,7 @@ function SpeakerTurnsEditor({
         </Stack>
       ))}
       <Button size="xs" variant="subtle" leftSection={<IconPlus size={14} />} onClick={add}>
-        Add turn
+        {t("conversations.addTurn")}
       </Button>
     </Stack>
   );
@@ -323,6 +327,7 @@ interface Props {
 }
 
 export function ConversationsSection({ organizationId, scopeId, scopeType, queryKey }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [createOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
   const [uploadOpened, { open: openUpload, close: closeUpload }] = useDisclosure(false);
@@ -506,14 +511,14 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
       <Modal
         opened={createOpened}
         onClose={closeCreate}
-        title="New conversation"
+        title={t("conversations.newTitle")}
         centered
         size="lg"
       >
         <Stack>
           <TextInput
-            label="Title"
-            placeholder="My conversation"
+            label={t("conversations.titleLabel")}
+            placeholder={t("conversations.titlePlaceholder")}
             value={title}
             onChange={(e) => setTitle(e.currentTarget.value)}
             data-autofocus
@@ -521,21 +526,21 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
           <Stack gap={6}>
             <Group justify="space-between" align="center">
               <Text size="sm" fw={500}>
-                Content
+                {t("conversations.contentLabel")}
               </Text>
               <SegmentedControl
                 size="xs"
                 value={contentMode}
                 onChange={(v) => setContentMode(v as "text" | "turns")}
                 data={[
-                  { label: "Plain text", value: "text" },
-                  { label: "Speaker turns", value: "turns" },
+                  { label: t("conversations.modeText"), value: "text" },
+                  { label: t("conversations.modeTurns"), value: "turns" },
                 ]}
               />
             </Group>
             {contentMode === "text" ? (
               <Textarea
-                placeholder="What's this conversation about?"
+                placeholder={t("conversations.contentPlaceholder")}
                 value={content}
                 onChange={(e) => setContent(e.currentTarget.value)}
                 rows={4}
@@ -546,7 +551,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
           </Stack>
           <Stack gap={4}>
             <Text size="sm" fw={500}>
-              Date &amp; time (UTC)
+              {t("conversations.dateTime")}
             </Text>
             <input
               type="datetime-local"
@@ -560,9 +565,6 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
                 fontSize: 14,
               }}
             />
-            <Text size="xs" c="dimmed">
-              Leave blank to use current time
-            </Text>
           </Stack>
           <MetadataEditor value={metadata} onChange={setMetadata} />
           {createMutation.isError && (
@@ -572,27 +574,33 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
           )}
           <Group justify="flex-end">
             <Button variant="default" onClick={closeCreate}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
-              Create
+              {t("common.create")}
             </Button>
           </Group>
         </Stack>
       </Modal>
 
       {/* Upload audio modal */}
-      <Modal opened={uploadOpened} onClose={closeUpload} title="Upload audio" centered size="md">
+      <Modal
+        opened={uploadOpened}
+        onClose={closeUpload}
+        title={t("conversations.uploadTitle")}
+        centered
+        size="md"
+      >
         <Stack>
           <TextInput
-            label="Title"
-            placeholder="Leave blank to use filename"
+            label={t("conversations.titleLabel")}
+            placeholder={t("conversations.titlePlaceholder")}
             value={uploadTitle}
             onChange={(e) => setUploadTitle(e.currentTarget.value)}
           />
           <Stack gap={4}>
             <Text size="sm" fw={500}>
-              Audio file
+              {t("conversations.audioFile")}
             </Text>
             <input
               ref={fileRef}
@@ -603,7 +611,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
             />
             <Group>
               <Button variant="default" size="xs" onClick={() => fileRef.current?.click()}>
-                Choose file
+                {t("conversations.chooseFile")}
               </Button>
               {audioFile && (
                 <Text size="xs" c="dimmed">
@@ -614,7 +622,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
           </Stack>
           <Stack gap={4}>
             <Text size="sm" fw={500}>
-              Date &amp; time (UTC)
+              {t("conversations.dateTime")}
             </Text>
             <input
               type="datetime-local"
@@ -628,9 +636,6 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
                 fontSize: 14,
               }}
             />
-            <Text size="xs" c="dimmed">
-              Leave blank to use current time
-            </Text>
           </Stack>
           <MetadataEditor value={uploadMetadata} onChange={setUploadMetadata} />
           {uploadMutation.isPending && <Progress animated value={100} size="xs" />}
@@ -641,14 +646,14 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
           )}
           <Group justify="flex-end">
             <Button variant="default" onClick={closeUpload} disabled={uploadMutation.isPending}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => uploadMutation.mutate()}
               loading={uploadMutation.isPending}
               disabled={!audioFile}
             >
-              Upload &amp; transcribe
+              {t("conversations.uploadAndTranscribe")}
             </Button>
           </Group>
         </Stack>
@@ -658,19 +663,19 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
       <Modal
         opened={editConv !== null}
         onClose={() => setEditConv(null)}
-        title="Edit conversation"
+        title={t("conversations.editTitle")}
         centered
         size="lg"
       >
         <Stack>
           <TextInput
-            label="Title"
+            label={t("conversations.titleLabel")}
             value={editTitle}
             onChange={(e) => setEditTitle(e.currentTarget.value)}
             data-autofocus
           />
           <Textarea
-            label="Content"
+            label={t("conversations.contentLabel")}
             value={editContent}
             onChange={(e) => setEditContent(e.currentTarget.value)}
             rows={4}
@@ -682,10 +687,10 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
           )}
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setEditConv(null)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={() => updateMutation.mutate()} loading={updateMutation.isPending}>
-              Save
+              {t("common.save")}
             </Button>
           </Group>
         </Stack>
@@ -695,14 +700,14 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
         <Group justify="space-between">
           <Group gap={6}>
             <Text fw={600} size="sm" c="dimmed">
-              CONVERSATIONS
+              {t("conversations.sectionTitle")}
             </Text>
             {(["conversation_timestamp", "title", "stats.duration_seconds"] as const).map(
               (field) => {
                 const labels: Record<string, string> = {
-                  conversation_timestamp: "Date",
-                  title: "Title",
-                  "stats.duration_seconds": "Duration",
+                  conversation_timestamp: t("conversations.sortDate"),
+                  title: t("conversations.sortTitle"),
+                  "stats.duration_seconds": t("conversations.sortDuration"),
                 };
                 const active = sortBy === field;
                 return (
@@ -720,17 +725,22 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
             )}
           </Group>
           <Group gap={6}>
-            <ActionIcon size="sm" variant="subtle" onClick={toggleFilters} title="Search / filter">
+            <ActionIcon
+              size="sm"
+              variant="subtle"
+              onClick={toggleFilters}
+              title={t("common.search")}
+            >
               <IconSearch size={14} />
             </ActionIcon>
             {canWriteScope && (
               <Button size="xs" variant="light" color="teal" onClick={openUpload}>
-                Upload audio
+                {t("conversations.uploadAudio")}
               </Button>
             )}
             {canWriteScope && (
               <Button size="xs" variant="light" onClick={openCreate}>
-                New
+                {t("conversations.new")}
               </Button>
             )}
           </Group>
@@ -756,8 +766,8 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
               if (badRegex) {
                 notifications.show({
                   color: "red",
-                  title: "Invalid regex",
-                  message: `"${badRegex.value}" is not a valid regular expression`,
+                  title: t("conversations.invalidRegex"),
+                  message: t("conversations.invalidRegexMsg", { value: badRegex.value }),
                 });
                 return;
               }
@@ -781,7 +791,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
             {error && <Alert color="red">{String(error)}</Alert>}
             {data?.items.length === 0 && (
               <Text size="sm" c="dimmed">
-                No conversations found.
+                {t("conversations.noResults")}
               </Text>
             )}
             {data?.items.map((conv) => (
@@ -841,6 +851,7 @@ function ConversationCard({
   onDelete: () => void;
   deleteLoading: boolean;
 }) {
+  const { t } = useTranslation();
   // Poll imports to know if a file was uploaded (determines if transcription badge should show)
   const { data: importJobs } = useQuery({
     queryKey: ["import-jobs", conv.id],
@@ -890,12 +901,12 @@ function ConversationCard({
             </Text>
             {isTranscribing && (
               <Badge size="xs" color="yellow" variant="dot">
-                transcribing…
+                {t("conversations.transcribing")}
               </Badge>
             )}
             {hasTranscript && (
               <Badge size="xs" color="teal" variant="dot">
-                transcript
+                {t("conversations.transcript")}
               </Badge>
             )}
           </Group>
@@ -932,7 +943,7 @@ function ConversationCard({
         {canMutate && (
           <Group gap={4} wrap="nowrap">
             <Button size="xs" variant="subtle" onClick={onEdit}>
-              Edit
+              {t("common.edit")}
             </Button>
             <Button
               size="xs"
@@ -941,7 +952,7 @@ function ConversationCard({
               loading={deleteLoading}
               onClick={onDelete}
             >
-              Delete
+              {t("common.delete")}
             </Button>
           </Group>
         )}

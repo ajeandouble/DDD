@@ -100,6 +100,9 @@ export const deleteConversation = (id: string): Promise<void> =>
 export const getMe = (): Promise<UserResponse> =>
   api.get("auth/me", { headers: authHeaders() }).json();
 
+export const updatePreferences = (locale: string): Promise<UserResponse> =>
+  api.patch("auth/me/preferences", { json: { locale }, headers: authHeaders() }).json();
+
 // --- Tags ---
 
 export interface TagResponse {

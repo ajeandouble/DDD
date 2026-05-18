@@ -32,6 +32,7 @@ import {
 } from "../lib/api";
 import type { WebhookEndpoint, Delivery } from "../dto/webhooks";
 import { useMyRoles } from "../hooks/useMyRoles";
+import { useTranslation } from "react-i18next";
 
 const DEFAULT_SAMPLE_PAYLOAD = JSON.stringify(
   {
@@ -85,6 +86,7 @@ result = {
 export function WebhooksPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const qc = useQueryClient();
+  const { t } = useTranslation();
   const [createOpen, { open: openCreate, close: closeCreate }] = useDisclosure(false);
 
   const { data: subscription, isLoading: subLoading } = useQuery({
@@ -119,24 +121,16 @@ export function WebhooksPage() {
   if (subscription?.tier === "starter") {
     return (
       <Stack gap="lg" align="center" mt="xl">
-        <Title order={3}>Webhooks</Title>
+        <Title order={3}>{t("webhooks.title")}</Title>
         <Text c="dimmed" ta="center" maw={400}>
-          Webhook endpoints are available on the <strong>Pro</strong> and{" "}
-          <strong>Enterprise</strong> plans. Upgrade to start sending real-time notifications.
-        </Text>
-        <Text size="sm" c="dimmed">
-          Current plan: <strong>Starter</strong> &mdash; {subscription.tokens_remaining ?? "∞"} of{" "}
-          {subscription.tokens_remaining != null
-            ? subscription.tokens_remaining + subscription.tokens_used
-            : "∞"}{" "}
-          tokens remaining this period
+          {t("webhooks.noAccess")}
         </Text>
         <Button
           onClick={() => upgradeMutation.mutate()}
           loading={upgradeMutation.isPending}
           size="sm"
         >
-          Upgrade to Pro
+          {t("billing.upgradeToPro")}
         </Button>
         {upgradeMutation.isError && <Alert color="red">{String(upgradeMutation.error)}</Alert>}
       </Stack>
@@ -146,7 +140,7 @@ export function WebhooksPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between">
-        <Title order={3}>Webhooks</Title>
+        <Title order={3}>{t("webhooks.title")}</Title>
         <Group gap="xs">
           {subscription && (
             <Text size="xs" c="dimmed">
@@ -155,7 +149,7 @@ export function WebhooksPage() {
           )}
           {isAdmin && (
             <Button size="xs" onClick={openCreate}>
-              New endpoint
+              {t("webhooks.newEndpoint")}
             </Button>
           )}
         </Group>
@@ -163,7 +157,7 @@ export function WebhooksPage() {
 
       {endpoints?.length === 0 && (
         <Text size="sm" c="dimmed">
-          No endpoints yet.
+          {t("webhooks.noEndpoints")}
         </Text>
       )}
 
@@ -200,6 +194,7 @@ function EndpointRow({
   onDelete: () => void;
   onUpdate: () => void;
 }) {
+  const { t } = useTranslation();
   const [logsOpen, { toggle: toggleLogs }] = useDisclosure(false);
   const [editOpen, { open: openEdit, close: closeEdit }] = useDisclosure(false);
 
@@ -224,7 +219,7 @@ function EndpointRow({
               {ep.url}
             </Text>
             <Badge size="xs" color={ep.enabled ? "green" : "gray"} variant="dot">
-              {ep.enabled ? "active" : "disabled"}
+              {ep.enabled ? t("webhooks.active") : t("webhooks.disabled")}
             </Badge>
             {ep.event_types.map((et) => (
               <Badge key={et} size="xs" variant="outline">
@@ -238,14 +233,14 @@ function EndpointRow({
         </Stack>
         <Group gap={4} wrap="nowrap">
           <Button size="xs" variant="subtle" onClick={toggleLogs}>
-            {logsOpen ? "Hide logs" : "Logs"}
+            {logsOpen ? t("webhooks.hideLogs") : t("webhooks.logs")}
           </Button>
           <Button size="xs" variant="subtle" onClick={openEdit}>
-            Edit
+            {t("webhooks.editBtn")}
           </Button>
           <Switch size="xs" checked={ep.enabled} onChange={() => toggleMutation.mutate()} />
           <Button size="xs" variant="subtle" color="red" onClick={onDelete}>
-            Delete
+            {t("webhooks.deleteBtn")}
           </Button>
         </Group>
       </Group>
@@ -255,7 +250,7 @@ function EndpointRow({
           {!deliveries && <Loader size="xs" />}
           {deliveries?.length === 0 && (
             <Text size="xs" c="dimmed">
-              No deliveries yet.
+              {t("webhooks.noDeliveries")}
             </Text>
           )}
           {deliveries?.map((d) => (
@@ -406,6 +401,7 @@ function CreateModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { t } = useTranslation();
   const [url, setUrl] = useState("");
   const [secret, setSecret] = useState("");
   const [transformer, setTransformer] = useState(DEFAULT_TRANSFORMER);
@@ -429,16 +425,16 @@ function CreateModal({
   });
 
   return (
-    <Modal opened={opened} onClose={onClose} title="New webhook endpoint" size="lg" centered>
+    <Modal opened={opened} onClose={onClose} title={t("webhooks.newTitle")} size="lg" centered>
       <Stack>
         <TextInput
-          label="URL"
-          placeholder="http://localhost:4000"
+          label={t("webhooks.urlLabel")}
+          placeholder={t("webhooks.urlPlaceholder")}
           value={url}
           onChange={(e) => setUrl(e.currentTarget.value)}
         />
         <TextInput
-          label="Secret (for HMAC signature)"
+          label={t("webhooks.secretLabel")}
           placeholder="optional"
           value={secret}
           onChange={(e) => setSecret(e.currentTarget.value)}
@@ -453,10 +449,10 @@ function CreateModal({
         {mutation.isError && <Alert color="red">{String(mutation.error)}</Alert>}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={!url}>
-            Create
+            {t("webhooks.createBtn")}
           </Button>
         </Group>
       </Stack>
@@ -477,6 +473,7 @@ function EditModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const [url, setUrl] = useState(ep.url);
   const [secret, setSecret] = useState(ep.secret);
   const [transformer, setTransformer] = useState(ep.transformer);
@@ -490,21 +487,25 @@ function EditModal({
   });
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Edit endpoint" size="lg" centered>
+    <Modal opened={opened} onClose={onClose} title={t("webhooks.editTitle")} size="lg" centered>
       <Stack>
-        <TextInput label="URL" value={url} onChange={(e) => setUrl(e.currentTarget.value)} />
         <TextInput
-          label="Secret"
+          label={t("webhooks.urlLabel")}
+          value={url}
+          onChange={(e) => setUrl(e.currentTarget.value)}
+        />
+        <TextInput
+          label={t("webhooks.secretLabel")}
           value={secret}
           onChange={(e) => setSecret(e.currentTarget.value)}
         />
         <TransformerSection transformer={transformer} onTransformerChange={setTransformer} />
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={() => mutation.mutate()} loading={mutation.isPending}>
-            Save
+            {t("webhooks.saveBtn")}
           </Button>
         </Group>
       </Stack>

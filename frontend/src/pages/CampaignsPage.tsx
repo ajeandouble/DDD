@@ -29,6 +29,7 @@ import { ScopeCard } from "../components/ScopeCard";
 import { ScopeSettingsModal } from "../components/ScopeSettingsModal";
 import { EditableTitle } from "../components/EditableTitle";
 import { useCanManageMembers } from "../hooks/useMyRoles";
+import { useTranslation } from "react-i18next";
 
 export function CampaignsPage() {
   const { orgId, projectId, subprojectId } = useParams<{
@@ -42,6 +43,7 @@ export function CampaignsPage() {
   const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
   const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
   const canManageMembersOnScope = useCanManageMembers(orgId, "subproject", subprojectId);
+  const { t } = useTranslation();
   const [name, setName] = useState("");
 
   const { data: org } = useQuery({
@@ -89,11 +91,11 @@ export function CampaignsPage() {
 
   return (
     <>
-      <Modal opened={opened} onClose={close} title="New campaign" centered>
+      <Modal opened={opened} onClose={close} title={t("campaigns.modalTitle")} centered>
         <Stack>
           <TextInput
-            label="Name"
-            placeholder="Email blast Jan 2025"
+            label={t("common.name")}
+            placeholder={t("campaigns.namePlaceholder")}
             value={name}
             onChange={(e) => setName(e.currentTarget.value)}
             onKeyDown={(e) => e.key === "Enter" && createMutation.mutate()}
@@ -106,10 +108,10 @@ export function CampaignsPage() {
           )}
           <Group justify="flex-end">
             <Button variant="default" onClick={close}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
-              Create
+              {t("common.create")}
             </Button>
           </Group>
         </Stack>
@@ -127,7 +129,7 @@ export function CampaignsPage() {
       <Stack gap="lg">
         <Breadcrumbs>
           <Anchor component={Link} to="/orgs" size="sm">
-            Organizations
+            {t("orgs.title")}
           </Anchor>
           <Anchor component={Link} to={`/orgs/${orgId}`} size="sm">
             {org?.name ?? orgId}
@@ -164,12 +166,12 @@ export function CampaignsPage() {
           <Group gap={6}>
             {canManageMembersOnScope && (
               <Button size="xs" variant="light" onClick={openSettings}>
-                Settings
+                {t("scopes.settings")}
               </Button>
             )}
             {canManageMembersOnScope && (
               <Button size="xs" variant="light" onClick={openMembers}>
-                Members
+                {t("scopes.members")}
               </Button>
             )}
           </Group>
@@ -185,9 +187,9 @@ export function CampaignsPage() {
         />
 
         <Group justify="space-between" mt="sm">
-          <Text fw={600}>Campaigns</Text>
+          <Text fw={600}>{t("projects.campaigns")}</Text>
           <Button size="xs" onClick={open}>
-            New campaign
+            {t("campaigns.new")}
           </Button>
         </Group>
 
@@ -195,7 +197,7 @@ export function CampaignsPage() {
         {error && <Alert color="red">{String(error)}</Alert>}
         {data?.length === 0 && (
           <Text c="dimmed" size="sm">
-            No campaigns yet.
+            {t("campaigns.noCampaigns")}
           </Text>
         )}
 

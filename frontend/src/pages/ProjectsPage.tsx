@@ -26,11 +26,13 @@ import {
 } from "../lib/api";
 import { MembersDrawer } from "../components/MembersDrawer";
 import { useCanManageMembers, useCanAdmin, useMyRoles } from "../hooks/useMyRoles";
+import { useTranslation } from "react-i18next";
 
 export function ProjectsPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [projectModalOpened, { open: openProjectModal, close: closeProjectModal }] =
     useDisclosure(false);
   const [campaignModalOpened, { open: openCampaignModal, close: closeCampaignModal }] =
@@ -85,11 +87,16 @@ export function ProjectsPage() {
 
   return (
     <>
-      <Modal opened={projectModalOpened} onClose={closeProjectModal} title="New project" centered>
+      <Modal
+        opened={projectModalOpened}
+        onClose={closeProjectModal}
+        title={t("projects.modalTitle")}
+        centered
+      >
         <Stack>
           <TextInput
-            label="Name"
-            placeholder="Q4 Campaign"
+            label={t("common.name")}
+            placeholder={t("projects.namePlaceholder")}
             value={projectName}
             onChange={(e) => setProjectName(e.currentTarget.value)}
             onKeyDown={(e) => e.key === "Enter" && createProjectMutation.mutate()}
@@ -102,13 +109,13 @@ export function ProjectsPage() {
           )}
           <Group justify="flex-end">
             <Button variant="default" onClick={closeProjectModal}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => createProjectMutation.mutate()}
               loading={createProjectMutation.isPending}
             >
-              Create
+              {t("common.create")}
             </Button>
           </Group>
         </Stack>
@@ -117,13 +124,13 @@ export function ProjectsPage() {
       <Modal
         opened={campaignModalOpened}
         onClose={closeCampaignModal}
-        title="New campaign"
+        title={t("campaigns.modalTitle")}
         centered
       >
         <Stack>
           <TextInput
-            label="Name"
-            placeholder="Summer blast"
+            label={t("common.name")}
+            placeholder={t("campaigns.namePlaceholder")}
             value={campaignName}
             onChange={(e) => setCampaignName(e.currentTarget.value)}
             onKeyDown={(e) => e.key === "Enter" && createCampaignMutation.mutate()}
@@ -136,13 +143,13 @@ export function ProjectsPage() {
           )}
           <Group justify="flex-end">
             <Button variant="default" onClick={closeCampaignModal}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => createCampaignMutation.mutate()}
               loading={createCampaignMutation.isPending}
             >
-              Create
+              {t("common.create")}
             </Button>
           </Group>
         </Stack>
@@ -151,7 +158,7 @@ export function ProjectsPage() {
       <Stack gap="lg">
         <Breadcrumbs>
           <Anchor component={Link} to="/orgs" size="sm">
-            Organizations
+            {t("orgs.title")}
           </Anchor>
           <Text size="sm">{org?.name ?? orgId}</Text>
         </Breadcrumbs>
@@ -161,17 +168,17 @@ export function ProjectsPage() {
           <Group gap={6}>
             {isOrgMember && (
               <Button size="xs" variant="light" component={Link} to={`/orgs/${orgId}/billing`}>
-                Billing
+                {t("billing.title")}
               </Button>
             )}
             {canAdminOrg && (
               <Button size="xs" variant="light" component={Link} to={`/orgs/${orgId}/webhooks`}>
-                Webhooks
+                {t("webhooks.title")}
               </Button>
             )}
             {canManageMembers && (
               <Button size="xs" variant="light" onClick={openMembers}>
-                Members
+                {t("members.title")}
               </Button>
             )}
           </Group>
@@ -188,16 +195,16 @@ export function ProjectsPage() {
 
         {/* Direct campaigns under this org */}
         <Group justify="space-between" mt="sm">
-          <Text fw={600}>Campaigns</Text>
+          <Text fw={600}>{t("projects.campaigns")}</Text>
           <Button size="xs" onClick={openCampaignModal}>
-            New campaign
+            {t("campaigns.new")}
           </Button>
         </Group>
 
         {campaignsLoading && <Loader size="sm" />}
         {campaigns?.length === 0 && (
           <Text c="dimmed" size="sm">
-            No campaigns yet.
+            {t("campaigns.noCampaigns")}
           </Text>
         )}
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
@@ -213,9 +220,9 @@ export function ProjectsPage() {
 
         {/* Projects */}
         <Group justify="space-between" mt="sm">
-          <Text fw={600}>Projects</Text>
+          <Text fw={600}>{t("projects.title")}</Text>
           <Button size="xs" onClick={openProjectModal}>
-            New project
+            {t("projects.new")}
           </Button>
         </Group>
 
@@ -223,7 +230,7 @@ export function ProjectsPage() {
         {projectsError && <Alert color="red">{String(projectsError)}</Alert>}
         {projects?.length === 0 && (
           <Text c="dimmed" size="sm">
-            No projects yet.
+            {t("projects.noProjects")}
           </Text>
         )}
 

@@ -18,6 +18,7 @@ export const TokenResponse = z.object({
 export const UserResponse = z.object({
   id: z.string().uuid(),
   email: z.string(),
+  locale: z.string().default("en"),
   created_at: z.string(),
 });
 

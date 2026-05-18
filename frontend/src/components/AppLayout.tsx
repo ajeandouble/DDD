@@ -15,7 +15,8 @@ import {
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
-import { getOrganizations } from "../lib/api";
+import { useTranslation } from "react-i18next";
+import { getOrganizations, getMe } from "../lib/api";
 
 export function AppLayout() {
   const navigate = useNavigate();
@@ -23,12 +24,27 @@ export function AppLayout() {
   const { setColorScheme } = useMantineColorScheme();
   const computed = useComputedColorScheme("light");
   const orgsMatch = useMatch("/orgs/:orgId/*");
+  const { t, i18n } = useTranslation();
   const activeOrgId = orgsMatch?.params.orgId;
 
   const { data: orgs, isLoading } = useQuery({
     queryKey: ["organizations"],
     queryFn: getOrganizations,
     retry: false,
+  });
+
+  useQuery({
+    queryKey: ["me"],
+    queryFn: getMe,
+    retry: false,
+    enabled: !!localStorage.getItem("token"),
+    staleTime: Infinity,
+    select: (user) => {
+      if (user.locale && user.locale !== i18n.language) {
+        i18n.changeLanguage(user.locale);
+      }
+      return user;
+    },
   });
 
   if (!localStorage.getItem("token")) {
@@ -70,7 +86,7 @@ export function AppLayout() {
               {computed === "dark" ? "☀" : "☽"}
             </ActionIcon>
             <Button variant="subtle" size="xs" color="gray" onClick={handleSignOut}>
-              Sign out
+              {t("nav.signOut")}
             </Button>
           </Group>
         </Group>
@@ -79,7 +95,7 @@ export function AppLayout() {
       <AppShell.Navbar p="xs">
         <Stack gap={2}>
           <Text size="xs" c="dimmed" px={8} py={4} fw={600}>
-            ORGANIZATIONS
+            {t("nav.organizations")}
           </Text>
           {isLoading && (
             <>
@@ -99,14 +115,14 @@ export function AppLayout() {
           ))}
           {orgs?.length === 0 && (
             <Text size="xs" c="dimmed" px={8}>
-              No organizations yet.
+              {t("nav.noOrgs")}
             </Text>
           )}
           <Divider my={4} />
           <NavLink
             component={Link}
             to="/settings"
-            label="Settings"
+            label={t("nav.settings")}
             onClick={closeNavbar}
             c="dimmed"
             styles={{ label: { fontSize: "var(--mantine-font-size-xs)" } }}
