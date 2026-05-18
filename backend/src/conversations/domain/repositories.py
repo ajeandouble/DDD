@@ -51,6 +51,7 @@ class ConversationRepository(ABC):
         page_size: int,
         sort_by: str = "timestamp",
         sort_dir: int = -1,
+        tag_ids: list[UUID] | None = None,
     ) -> PagedResult: ...
 
     @abstractmethod

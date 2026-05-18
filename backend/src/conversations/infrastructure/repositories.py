@@ -144,6 +144,7 @@ class MongoConversationRepository(MongoRepository, ConversationRepository):
         page_size: int,
         sort_by: str = "conversation_timestamp",
         sort_dir: int = -1,
+        tag_ids: list[UUID] | None = None,
     ) -> PagedResult:
         _SORTABLE = {
             "conversation_timestamp",
@@ -163,6 +164,8 @@ class MongoConversationRepository(MongoRepository, ConversationRepository):
             query["scope_id"] = None
         if scope_type is not None:
             query["scope_type"] = scope_type
+        if tag_ids:
+            query["tag_ids"] = {"$in": tag_ids}
 
         and_clauses = [c for f in filters if (c := _build_filter_clause(f))]
         if and_clauses:

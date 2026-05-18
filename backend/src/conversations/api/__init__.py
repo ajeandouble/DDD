@@ -123,6 +123,7 @@ class FilterInput(BaseModel):
 
 class SearchBody(BaseModel):
     filters: list[FilterInput] = []
+    tag_ids: list[UUID] = []
     page: int = 1
     page_size: int = 20
     sort_by: str = "conversation_timestamp"
@@ -227,6 +228,7 @@ async def search_conversations(
         page_size=body.page_size,
         sort_by=body.sort_by,
         sort_dir=body.sort_dir,
+        tag_ids=body.tag_ids or None,
     )
     return PagedConversations(
         items=[_to_response(c) for c in result.items],

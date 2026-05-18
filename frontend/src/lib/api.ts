@@ -51,6 +51,7 @@ export const searchConversations = (
   params: { organization_id?: string; scope_id?: string; scope_type?: string },
   body: {
     filters: ConvFilter[];
+    tag_ids?: string[];
     page: number;
     page_size: number;
     sort_by: string;

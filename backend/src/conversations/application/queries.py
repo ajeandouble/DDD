@@ -39,6 +39,7 @@ class ConversationQueryHandler:
         page_size: int,
         sort_by: str = "timestamp",
         sort_dir: int = -1,
+        tag_ids: list[UUID] | None = None,
     ) -> PagedResult:
         return await self._repo.search(
             organization_id=organization_id,
@@ -49,4 +50,5 @@ class ConversationQueryHandler:
             page_size=page_size,
             sort_by=sort_by,
             sort_dir=sort_dir,
+            tag_ids=tag_ids,
         )

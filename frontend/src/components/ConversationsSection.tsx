@@ -19,11 +19,14 @@ import {
   SegmentedControl,
   ActionIcon,
   Select,
+  MultiSelect,
   Pagination,
   Collapse,
+  ScrollArea,
 } from "@mantine/core";
 import { IconPlus, IconTrash, IconSearch } from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import {
   searchConversations,
   createConversation,
@@ -32,11 +35,41 @@ import {
   getMe,
   uploadAudio,
   getImportJobs,
+  listTags,
 } from "../lib/api";
 import type { ConvFilter, FilterField, FilterOp } from "../lib/api";
 import type { ConversationResponse } from "../dto/conversations";
 import { useMyRoles } from "../hooks/useMyRoles";
 import { canWrite } from "../dto/permissions";
+
+const PAGE_SIZE_OPTIONS = ["25", "50", "100"];
+const PREFS_KEY = "conv_prefs";
+
+interface CampaignPrefs {
+  pageSize: number;
+  sortBy: string;
+  sortDir: number;
+}
+
+function loadPrefs(scopeId: string): CampaignPrefs {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    const all = raw ? JSON.parse(raw) : {};
+    return all[scopeId] ?? { pageSize: 25, sortBy: "conversation_timestamp", sortDir: -1 };
+  } catch {
+    return { pageSize: 25, sortBy: "conversation_timestamp", sortDir: -1 };
+  }
+}
+
+function savePrefs(scopeId: string, prefs: CampaignPrefs) {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    const all = raw ? JSON.parse(raw) : {};
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ ...all, [scopeId]: prefs }));
+  } catch {
+    // ignore
+  }
+}
 
 type MetaRow = { key: string; value: string };
 
@@ -122,11 +155,17 @@ function FilterRow({
 function FilterPanel({
   value,
   onChange,
+  tagOptions,
+  draftTagIds,
+  onTagIdsChange,
   onApply,
   onClear,
 }: {
   value: ConvFilter[];
   onChange: (v: ConvFilter[]) => void;
+  tagOptions: { value: string; label: string }[];
+  draftTagIds: string[];
+  onTagIdsChange: (ids: string[]) => void;
   onApply: () => void;
   onClear: () => void;
 }) {
@@ -138,6 +177,16 @@ function FilterPanel({
   return (
     <Paper withBorder p="xs" radius="sm">
       <Stack gap={6}>
+        {tagOptions.length > 0 && (
+          <MultiSelect
+            size="xs"
+            placeholder="Filter by tag…"
+            data={tagOptions}
+            value={draftTagIds}
+            onChange={onTagIdsChange}
+            clearable
+          />
+        )}
         {value.map((f, i) => (
           <FilterRow
             key={i}
@@ -293,20 +342,33 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
+  const { data: orgTags } = useQuery({
+    queryKey: ["tags", organizationId],
+    queryFn: () => listTags(organizationId),
+    retry: false,
+  });
 
   const { data: myRoles } = useMyRoles(organizationId);
   const scopeRole =
     scopeType === "campaign" ? (myRoles?.campaigns?.[scopeId] ?? null) : (myRoles?.org ?? null);
   const canWriteScope = canWrite(scopeRole);
 
-  // Search / pagination / sort state
-  const PAGE_SIZE = 10;
+  // Search / pagination / sort state — initialized from per-campaign localStorage prefs
+  const initialPrefs = loadPrefs(scopeId);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPrefs.pageSize);
   const [filtersOpen, { toggle: toggleFilters }] = useDisclosure(false);
   const [activeFilters, setActiveFilters] = useState<ConvFilter[]>([]);
   const [draftFilters, setDraftFilters] = useState<ConvFilter[]>([]);
-  const [sortBy, setSortBy] = useState("conversation_timestamp");
-  const [sortDir, setSortDir] = useState(-1);
+  const [activeTagIds, setActiveTagIds] = useState<string[]>([]);
+  const [draftTagIds, setDraftTagIds] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState(initialPrefs.sortBy);
+  const [sortDir, setSortDir] = useState(initialPrefs.sortDir);
+
+  // Persist prefs whenever they change
+  useEffect(() => {
+    savePrefs(scopeId, { pageSize, sortBy, sortDir });
+  }, [scopeId, pageSize, sortBy, sortDir]);
 
   const toggleSort = (field: string) => {
     if (sortBy === field) setSortDir((d) => (d === -1 ? 1 : -1));
@@ -327,12 +389,22 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
       : { organization_id: organizationId };
 
   const { data, isLoading, error, dataUpdatedAt } = useQuery({
-    queryKey: ["conversations", ...queryKey, page, activeFilters, sortBy, sortDir],
+    queryKey: [
+      "conversations",
+      ...queryKey,
+      page,
+      pageSize,
+      activeFilters,
+      activeTagIds,
+      sortBy,
+      sortDir,
+    ],
     queryFn: () =>
       searchConversations(scopeParams, {
         filters: activeFilters,
+        tag_ids: activeTagIds.length ? activeTagIds : undefined,
         page,
-        page_size: PAGE_SIZE,
+        page_size: pageSize,
         sort_by: sortBy,
         sort_dir: sortDir,
       }),
@@ -668,47 +740,86 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
           <FilterPanel
             value={draftFilters}
             onChange={setDraftFilters}
+            tagOptions={(orgTags ?? []).map((t) => ({ value: t.id, label: t.name }))}
+            draftTagIds={draftTagIds}
+            onTagIdsChange={setDraftTagIds}
             onApply={() => {
+              const badRegex = draftFilters.find((f) => {
+                if (f.op !== "regex") return false;
+                try {
+                  new RegExp(f.value);
+                  return false;
+                } catch {
+                  return true;
+                }
+              });
+              if (badRegex) {
+                notifications.show({
+                  color: "red",
+                  title: "Invalid regex",
+                  message: `"${badRegex.value}" is not a valid regular expression`,
+                });
+                return;
+              }
               setActiveFilters(draftFilters);
+              setActiveTagIds(draftTagIds);
               setPage(1);
             }}
             onClear={() => {
               setDraftFilters([]);
               setActiveFilters([]);
+              setDraftTagIds([]);
+              setActiveTagIds([]);
               setPage(1);
             }}
           />
         </Collapse>
 
-        {isLoading && <Loader size="sm" />}
-        {error && <Alert color="red">{String(error)}</Alert>}
-        {data?.items.length === 0 && (
-          <Text size="sm" c="dimmed">
-            No conversations found.
-          </Text>
-        )}
+        <ScrollArea h="calc(100vh - 260px)" type="auto">
+          <Stack gap="sm">
+            {isLoading && <Loader size="sm" />}
+            {error && <Alert color="red">{String(error)}</Alert>}
+            {data?.items.length === 0 && (
+              <Text size="sm" c="dimmed">
+                No conversations found.
+              </Text>
+            )}
+            {data?.items.map((conv) => (
+              <ConversationCard
+                key={conv.id}
+                conv={conv}
+                tagMap={Object.fromEntries((orgTags ?? []).map((t) => [t.id, t.name]))}
+                canMutate={canMutate(conv)}
+                onEdit={() => openEdit(conv)}
+                onDelete={() => deleteMutation.mutate(conv.id)}
+                deleteLoading={deleteMutation.isPending && deleteMutation.variables === conv.id}
+              />
+            ))}
+          </Stack>
+        </ScrollArea>
 
-        {data?.items.map((conv) => (
-          <ConversationCard
-            key={conv.id}
-            conv={conv}
-            canMutate={canMutate(conv)}
-            onEdit={() => openEdit(conv)}
-            onDelete={() => deleteMutation.mutate(conv.id)}
-            deleteLoading={deleteMutation.isPending && deleteMutation.variables === conv.id}
+        <Group justify="space-between" align="center" mt="xs">
+          <Select
+            size="xs"
+            style={{ width: 80 }}
+            data={PAGE_SIZE_OPTIONS}
+            value={String(pageSize)}
+            onChange={(v) => {
+              if (v) {
+                setPageSize(Number(v));
+                setPage(1);
+              }
+            }}
           />
-        ))}
-
-        {data && data.total > PAGE_SIZE && (
-          <Group justify="center" mt="xs">
+          {data && data.total > pageSize && (
             <Pagination
-              total={Math.ceil(data.total / PAGE_SIZE)}
+              total={Math.ceil(data.total / pageSize)}
               value={page}
               onChange={setPage}
               size="sm"
             />
-          </Group>
-        )}
+          )}
+        </Group>
       </Stack>
       <Divider mt="xl" />
     </>
@@ -717,12 +828,14 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
 
 function ConversationCard({
   conv,
+  tagMap,
   canMutate,
   onEdit,
   onDelete,
   deleteLoading,
 }: {
   conv: ConversationResponse;
+  tagMap: Record<string, string>;
   canMutate: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -795,6 +908,15 @@ function ConversationCard({
             <Text size="xs" c="dimmed">
               {Math.round(conv.stats.duration_seconds)}s · {conv.stats.word_count} words
             </Text>
+          )}
+          {conv.tag_ids.length > 0 && (
+            <Group gap={4}>
+              {conv.tag_ids.map((id) => (
+                <Badge key={id} size="xs" variant="light" color="violet">
+                  {tagMap[id] ?? id}
+                </Badge>
+              ))}
+            </Group>
           )}
           {conv.metadata.length > 0 && (
             <Group gap={4}>
