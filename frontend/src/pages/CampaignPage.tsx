@@ -81,7 +81,7 @@ export function CampaignPage() {
   const color = campaign?.color;
 
   return (
-    <Stack gap="lg" h="100vh" style={{ overflow: "hidden" }}>
+    <Stack gap="lg" h="100%" style={{ overflow: "hidden" }}>
       <Breadcrumbs>{breadcrumbItems}</Breadcrumbs>
 
       <Group

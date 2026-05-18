@@ -114,7 +114,7 @@ export function AppLayout() {
         </Stack>
       </AppShell.Navbar>
 
-      <AppShell.Main>
+      <AppShell.Main style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <Outlet />
       </AppShell.Main>
     </AppShell>

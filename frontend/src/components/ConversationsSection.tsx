@@ -691,7 +691,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
         </Stack>
       </Modal>
 
-      <Stack gap="sm">
+      <Stack gap="sm" style={{ flex: 1, minHeight: 0 }}>
         <Group justify="space-between">
           <Group gap={6}>
             <Text fw={600} size="sm" c="dimmed">
@@ -775,7 +775,7 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
           />
         </Collapse>
 
-        <ScrollArea h="calc(100vh - 260px)" type="auto">
+        <ScrollArea style={{ flex: 1 }} type="auto">
           <Stack gap="sm">
             {isLoading && <Loader size="sm" />}
             {error && <Alert color="red">{String(error)}</Alert>}
