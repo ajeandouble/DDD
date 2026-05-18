@@ -155,9 +155,11 @@ export function CampaignsPage() {
             value={subproject?.name ?? ""}
             order={2}
             canEdit={canManageMembersOnScope}
-            onSave={(name) => renameSubproject(subprojectId!, name).then((sp) => {
-              queryClient.setQueryData(["subproject", subprojectId], sp);
-            })}
+            onSave={(name) =>
+              renameSubproject(subprojectId!, name).then((sp) => {
+                queryClient.setQueryData(["subproject", subprojectId], sp);
+              })
+            }
           />
           <Group gap={6}>
             {canManageMembersOnScope && (

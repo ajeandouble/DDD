@@ -31,6 +31,7 @@ class ImportJobResponse(BaseModel):
     content_type: str
     status: str
     storage_key: str | None
+    file_hash: str | None
     created_at: str
     failed_reason: str | None
 
@@ -43,6 +44,7 @@ def _to_response(job: ImportJob) -> ImportJobResponse:
         content_type=job.content_type,
         status=job.status,
         storage_key=job.storage_key,
+        file_hash=job.file_hash,
         created_at=job.created_at.isoformat(),
         failed_reason=job.failed_reason,
     )
@@ -87,8 +89,8 @@ async def upload_file(
         tmp.write(content)
         tmp_path = tmp.name
 
-    storage_key = await store_file(tmp_path, file.filename or "upload")
-    job.mark_uploaded(storage_key)
+    storage_key, file_hash = await store_file(tmp_path, file.filename or "upload")
+    job.mark_uploaded(storage_key, file_hash)
     await repo.save(job)
 
     await publish(

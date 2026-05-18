@@ -357,12 +357,16 @@ async def create_project(
 async def list_org_campaigns(
     org_id: UUID,
     queries: CampaignQueryHandler = Depends(_campaign_queries),
+    org_queries: OrganizationQueryHandler = Depends(_org_queries),
     principal: Principal = Depends(get_current_principal),
+    authz: AuthorizationService = Depends(get_authz),
 ):
-    owner_id = principal.id if isinstance(principal, User) else principal.owner_id
-    org = await get_db()["organizations"].find_one({"_id": org_id, "member_ids": owner_id})
-    if org is None:
-        return []
+    subj = principal_subject(principal)
+    if not authz.is_superadmin(subj):
+        owner_id = principal.id if isinstance(principal, User) else principal.owner_id
+        org = await org_queries.get_by_id(org_id)
+        if org is None or not org.is_member(owner_id):
+            return []
     return [_campaign_resp(c) for c in await queries.list_by_parent(org_id)]
 
 
@@ -431,12 +435,23 @@ async def rename_project(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     subj = principal_subject(principal)
     await _require(
-        await authz.can_do(subj, "manage_members", "project", str(project_id), org_id=str(p.organization_id))
+        await authz.can_do(
+            subj, "manage_members", "project", str(project_id), org_id=str(p.organization_id)
+        )
     )
     try:
-        return _project_resp(await commands.rename(RenameProjectCommand(project_id=project_id, name=body.name)))
+        return _project_resp(
+            await commands.rename(RenameProjectCommand(project_id=project_id, name=body.name))
+        )
     except (ScopeNotFound, ValueError) as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND if isinstance(e, ScopeNotFound) else status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+                if isinstance(e, ScopeNotFound)
+                else status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=str(e),
+        )
 
 
 # --- Subprojects ---
@@ -600,9 +615,20 @@ async def rename_subproject(
         await authz.can_do(subj, "manage_members", "subproject", str(subproject_id), org_id=org_id)
     )
     try:
-        return _subproject_resp(await commands.rename(RenameSubprojectCommand(subproject_id=subproject_id, name=body.name)))
+        return _subproject_resp(
+            await commands.rename(
+                RenameSubprojectCommand(subproject_id=subproject_id, name=body.name)
+            )
+        )
     except (ScopeNotFound, ValueError) as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND if isinstance(e, ScopeNotFound) else status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+                if isinstance(e, ScopeNotFound)
+                else status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=str(e),
+        )
 
 
 # --- Campaigns under subproject ---
@@ -702,12 +728,23 @@ async def rename_campaign(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
     subj = principal_subject(principal)
     await _require(
-        await authz.can_do(subj, "manage_members", "campaign", str(campaign_id), org_id=str(c.organization_id))
+        await authz.can_do(
+            subj, "manage_members", "campaign", str(campaign_id), org_id=str(c.organization_id)
+        )
     )
     try:
-        return _campaign_resp(await commands.rename(RenameCampaignCommand(campaign_id=campaign_id, name=body.name)))
+        return _campaign_resp(
+            await commands.rename(RenameCampaignCommand(campaign_id=campaign_id, name=body.name))
+        )
     except (ScopeNotFound, ValueError) as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND if isinstance(e, ScopeNotFound) else status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+                if isinstance(e, ScopeNotFound)
+                else status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=str(e),
+        )
 
 
 @router.patch("/projects/{project_id}/settings", response_model=ProjectResponse)

@@ -20,13 +20,14 @@ from src.iam.application.event_handlers import register_handlers as register_iam
 from src.scopes.application.event_handlers import register_handlers as register_scopes_handlers
 from src.iam.application.auth_service import AuthService
 from src.iam.application.authorization_service import AuthorizationService
-from src.iam.domain.models import Group, Tag
+from src.iam.domain.models import Group
 from src.iam.infrastructure.enforcer import init_enforcer
 from src.iam.infrastructure.repositories import (
     MongoGroupRepository,
-    MongoTagRepository,
     MongoUserRepository,
 )
+from src.conversations.domain.models import Tag
+from src.conversations.infrastructure.repositories import MongoTagRepository
 from src.scopes.application.commands import (
     CampaignCommandHandler,
     CreateCampaignCommand,
@@ -160,13 +161,13 @@ async def main() -> None:
     await authz.assign_role(f"user:{ivan.id}",   "viewer",     "org",        oid)
 
     group_repo = MongoGroupRepository(db)
-    design_team = Group.create(name="Design Team", org_id=org.id)
+    design_team = Group.create(name="Design Team", org_id=org.id, owner_id=alice.id)
     design_team.add_member(carol.id)
     design_team.add_member(grace.id)
     await group_repo.save(design_team)
     await authz.assign_role(f"group:{design_team.id}", "editor", "org", oid)
 
-    ops_team = Group.create(name="Ops Team", org_id=org.id)
+    ops_team = Group.create(name="Ops Team", org_id=org.id, owner_id=alice.id)
     ops_team.add_member(bob.id)
     ops_team.add_member(eve.id)
     await group_repo.save(ops_team)
@@ -192,6 +193,7 @@ async def main() -> None:
         await conv.create(CreateConversationCommand(
             title=f"{topic} — {agent} #{i + 1:02d}",
             content=f"Transcript of {topic.lower()} with {agent}.",
+            type="conversation",
             created_by=creator.id,
             organization_id=org.id,
             scope_id=campaign.id,

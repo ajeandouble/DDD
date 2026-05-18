@@ -161,7 +161,9 @@ export const renameProject = (projectId: string, name: string): Promise<Project>
   api.patch(`scopes/projects/${projectId}`, { json: { name }, headers: authHeaders() }).json();
 
 export const renameSubproject = (subprojectId: string, name: string): Promise<Subproject> =>
-  api.patch(`scopes/subprojects/${subprojectId}`, { json: { name }, headers: authHeaders() }).json();
+  api
+    .patch(`scopes/subprojects/${subprojectId}`, { json: { name }, headers: authHeaders() })
+    .json();
 
 export const renameCampaign = (campaignId: string, name: string): Promise<Campaign> =>
   api.patch(`scopes/campaigns/${campaignId}`, { json: { name }, headers: authHeaders() }).json();

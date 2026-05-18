@@ -13,6 +13,7 @@ def _to_doc(job: ImportJob) -> dict:
         "created_by": job.created_by,
         "status": job.status,
         "storage_key": job.storage_key,
+        "file_hash": job.file_hash,
         "created_at": job.created_at,
         "failed_reason": job.failed_reason,
     }
@@ -27,6 +28,7 @@ def _from_doc(doc: dict) -> ImportJob:
         created_by=doc["created_by"],
         status=ImportStatus(doc["status"]),
         storage_key=doc.get("storage_key"),
+        file_hash=doc.get("file_hash"),
         created_at=doc["created_at"],
         failed_reason=doc.get("failed_reason"),
     )

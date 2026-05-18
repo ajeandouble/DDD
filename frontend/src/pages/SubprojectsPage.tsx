@@ -208,9 +208,11 @@ export function SubprojectsPage() {
             value={project?.name ?? ""}
             order={2}
             canEdit={canManageMembersOnScope}
-            onSave={(name) => renameProject(projectId!, name).then((p) => {
-              queryClient.setQueryData(["project", projectId], p);
-            })}
+            onSave={(name) =>
+              renameProject(projectId!, name).then((p) => {
+                queryClient.setQueryData(["project", projectId], p);
+              })
+            }
           />
           <Group gap={6}>
             {canManageMembersOnScope && (

@@ -101,9 +101,11 @@ export function CampaignPage() {
           value={campaign?.name ?? ""}
           order={2}
           canEdit={canSettings}
-          onSave={(name) => renameCampaign(campaignId!, name).then((c) => {
-            queryClient.setQueryData(["campaign", campaignId], c);
-          })}
+          onSave={(name) =>
+            renameCampaign(campaignId!, name).then((c) => {
+              queryClient.setQueryData(["campaign", campaignId], c);
+            })
+          }
         />
         <Group gap={6}>
           {canSettings && (
