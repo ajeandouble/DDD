@@ -96,7 +96,7 @@ async def upgrade_org_subscription(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
     if body.tier not in PLAN_LIMITS:
         raise HTTPException(status_code=400, detail=f"Unknown tier: {body.tier}")
-    sub = await upgrade_tier(org_id=org_id, new_tier=body.tier, sub_repo=sub_repo)
+    sub = await upgrade_tier(org_id=org_id, new_tier=body.tier, sub_repo=sub_repo, owner_id=user.id)
     return _sub_resp(sub)
 
 

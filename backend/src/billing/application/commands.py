@@ -24,11 +24,15 @@ async def create_subscription(
 
 
 async def upgrade_tier(
-    org_id: UUID, new_tier: str, sub_repo: SubscriptionRepository
+    org_id: UUID, new_tier: str, sub_repo: SubscriptionRepository, owner_id: UUID | None = None
 ) -> Subscription:
     sub = await sub_repo.find_by_org(org_id)
     if sub is None:
-        raise ValueError(f"No subscription for org {org_id}")
+        if owner_id is None:
+            raise ValueError(f"No subscription for org {org_id}")
+        sub = Subscription.create(org_id=org_id, owner_id=owner_id)
+        await sub_repo.save(sub)
+        await publish(SubscriptionCreated(org_id=org_id, tier=sub.tier))
     old_tier = sub.tier
     sub.upgrade(new_tier)
     await sub_repo.update(sub)

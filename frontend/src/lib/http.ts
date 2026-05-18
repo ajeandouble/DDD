@@ -7,9 +7,11 @@ export const api = ky.create({
     beforeError: [
       async ({ error }) => {
         if (isHTTPError(error)) {
-          if (error.response.status === 401 && window.location.pathname !== "/login") {
-            localStorage.removeItem("token");
-            window.location.href = "/login";
+          if (error.response.status === 401) {
+            if (window.location.pathname !== "/login") {
+              localStorage.removeItem("token");
+              window.location.href = "/login";
+            }
             return error;
           }
           await showErrorToast(error);
