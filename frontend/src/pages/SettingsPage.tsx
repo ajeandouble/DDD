@@ -17,6 +17,7 @@ import {
   CopyButton,
   Divider,
   Alert,
+  ActionIcon,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
@@ -30,9 +31,12 @@ import {
   getMyRoles,
   getMe,
   updatePreferences,
+  listTags,
+  createTag,
+  deleteTag,
 } from "../lib/api";
 import type { ApiKeyCreated } from "../dto/iam";
-import { canManageMembers, getEffectiveRole } from "../dto/permissions";
+import { canManageMembers, canWrite, getEffectiveRole } from "../dto/permissions";
 
 const SCOPE_TYPES = [
   { value: "org", label: "Organization" },
@@ -75,6 +79,35 @@ export function SettingsPage() {
   const { data: keys, isLoading } = useQuery({
     queryKey: ["api-keys"],
     queryFn: listApiKeys,
+  });
+
+  const [tagOrgId, setTagOrgId] = useState<string | null>(null);
+  const [newTagName, setNewTagName] = useState("");
+
+  const { data: tags } = useQuery({
+    queryKey: ["tags", tagOrgId],
+    queryFn: () => listTags(tagOrgId!),
+    enabled: !!tagOrgId,
+  });
+
+  const { data: tagOrgRoles } = useQuery({
+    queryKey: ["my-roles", tagOrgId],
+    queryFn: () => getMyRoles(tagOrgId!),
+    enabled: !!tagOrgId,
+  });
+  const tagOrgRole = tagOrgId ? getEffectiveRole("org", tagOrgId, tagOrgRoles) : null;
+
+  const createTagMutation = useMutation({
+    mutationFn: () => createTag(tagOrgId!, newTagName.trim()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tags", tagOrgId] });
+      setNewTagName("");
+    },
+  });
+
+  const deleteTagMutation = useMutation({
+    mutationFn: (tagId: string) => deleteTag(tagOrgId!, tagId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tags", tagOrgId] }),
   });
 
   const { data: orgs } = useQuery({
@@ -263,6 +296,81 @@ export function SettingsPage() {
               ))}
             </Table.Tbody>
           </Table>
+        )}
+      </Stack>
+
+      <Divider />
+
+      <Stack gap="sm">
+        <div>
+          <Text fw={600} size="lg">
+            {t("settings.tags")}
+          </Text>
+          <Text size="sm" c="dimmed">
+            {t("settings.tagsDesc")}
+          </Text>
+        </div>
+        <Select
+          style={{ width: 260 }}
+          placeholder={t("settings.selectOrgForTags")}
+          data={orgs?.map((o) => ({ value: o.id, label: o.name })) ?? []}
+          value={tagOrgId}
+          onChange={setTagOrgId}
+        />
+        {tagOrgId && (
+          <Stack gap="xs">
+            {tags?.length === 0 && (
+              <Text size="sm" c="dimmed">
+                {t("settings.noTags")}
+              </Text>
+            )}
+            {tags && tags.length > 0 && (
+              <Group gap="xs" wrap="wrap">
+                {tags.map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant="light"
+                    rightSection={
+                      canManageMembers(tagOrgRole) ? (
+                        <ActionIcon
+                          size="xs"
+                          color="gray"
+                          variant="transparent"
+                          onClick={() => deleteTagMutation.mutate(tag.id)}
+                          aria-label={t("common.delete")}
+                        >
+                          ×
+                        </ActionIcon>
+                      ) : undefined
+                    }
+                  >
+                    {tag.name}
+                  </Badge>
+                ))}
+              </Group>
+            )}
+            {canWrite(tagOrgRole) && (
+              <Group gap="xs">
+                <TextInput
+                  placeholder={t("settings.newTagPlaceholder")}
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newTagName.trim()) createTagMutation.mutate();
+                  }}
+                  size="sm"
+                />
+                <Button
+                  size="sm"
+                  loading={createTagMutation.isPending}
+                  disabled={!newTagName.trim()}
+                  onClick={() => createTagMutation.mutate()}
+                >
+                  {t("settings.addTag")}
+                </Button>
+              </Group>
+            )}
+          </Stack>
         )}
       </Stack>
 

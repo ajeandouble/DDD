@@ -80,7 +80,13 @@
     "saveKeyDesc": "This is the only time the full key will be shown. It cannot be recovered.",
     "copyToClipboard": "Copy to clipboard",
     "copied": "Copied!",
-    "keyUsageHint": "Use this key in the Authorization: Bearer <key> header."
+    "keyUsageHint": "Use this key in the Authorization: Bearer <key> header.",
+    "tags": "Tags",
+    "tagsDesc": "Manage tags available for conversations in this organization.",
+    "selectOrgForTags": "Select an organization",
+    "noTags": "No tags yet.",
+    "newTagPlaceholder": "Tag name",
+    "addTag": "Add tag"
   },
   "scopes": {
     "settings": "Settings",

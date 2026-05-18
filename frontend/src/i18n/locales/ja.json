@@ -80,7 +80,13 @@
     "saveKeyDesc": "完全なキーが表示されるのはこれが最後です。復元することはできません。",
     "copyToClipboard": "クリップボードにコピー",
     "copied": "コピーしました！",
-    "keyUsageHint": "このキーをAuthorization: Bearer <キー>ヘッダーで使用してください。"
+    "keyUsageHint": "このキーをAuthorization: Bearer <キー>ヘッダーで使用してください。",
+    "tags": "タグ",
+    "tagsDesc": "この組織の会話で使用できるタグを管理します。",
+    "selectOrgForTags": "組織を選択",
+    "noTags": "タグはまだありません。",
+    "newTagPlaceholder": "タグ名",
+    "addTag": "タグを追加"
   },
   "scopes": {
     "settings": "設定",

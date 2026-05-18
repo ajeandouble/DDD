@@ -80,7 +80,13 @@
     "saveKeyDesc": "这是唯一一次显示完整密钥的机会，无法恢复。",
     "copyToClipboard": "复制到剪贴板",
     "copied": "已复制！",
-    "keyUsageHint": "在 Authorization: Bearer <密钥> 标头中使用此密钥。"
+    "keyUsageHint": "在 Authorization: Bearer <密钥> 标头中使用此密钥。",
+    "tags": "标签",
+    "tagsDesc": "管理此组织中对话可用的标签。",
+    "selectOrgForTags": "选择组织",
+    "noTags": "暂无标签。",
+    "newTagPlaceholder": "标签名称",
+    "addTag": "添加标签"
   },
   "scopes": {
     "settings": "设置",

@@ -80,7 +80,13 @@
     "saveKeyDesc": "Esta es la única vez que se mostrará la clave completa. No podrá recuperarse.",
     "copyToClipboard": "Copiar al portapapeles",
     "copied": "¡Copiado!",
-    "keyUsageHint": "Usa esta clave en el encabezado Authorization: Bearer <clave>."
+    "keyUsageHint": "Usa esta clave en el encabezado Authorization: Bearer <clave>.",
+    "tags": "Etiquetas",
+    "tagsDesc": "Gestiona las etiquetas disponibles para las conversaciones de esta organización.",
+    "selectOrgForTags": "Selecciona una organización",
+    "noTags": "Aún no hay etiquetas.",
+    "newTagPlaceholder": "Nombre de etiqueta",
+    "addTag": "Añadir etiqueta"
   },
   "scopes": {
     "settings": "Ajustes",

@@ -80,7 +80,13 @@
     "saveKeyDesc": "Dies ist das einzige Mal, dass der vollständige Schlüssel angezeigt wird. Er kann nicht wiederhergestellt werden.",
     "copyToClipboard": "In die Zwischenablage kopieren",
     "copied": "Kopiert!",
-    "keyUsageHint": "Verwenden Sie diesen Schlüssel im Header Authorization: Bearer <Schlüssel>."
+    "keyUsageHint": "Verwenden Sie diesen Schlüssel im Header Authorization: Bearer <Schlüssel>.",
+    "tags": "Tags",
+    "tagsDesc": "Verwalten Sie Tags, die für Gespräche in dieser Organisation verfügbar sind.",
+    "selectOrgForTags": "Organisation auswählen",
+    "noTags": "Noch keine Tags.",
+    "newTagPlaceholder": "Tag-Name",
+    "addTag": "Tag hinzufügen"
   },
   "scopes": {
     "settings": "Einstellungen",
