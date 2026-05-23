@@ -8,7 +8,9 @@ from src.iam.domain.models import ApiKey, Group, Role, User
 from src.iam.infrastructure.repositories import (
     MongoApiKeyRepository,
     MongoGroupRepository,
+    MongoUserRepository,
 )
+from src.iam.infrastructure.scope_query import OrgScopeQuery
 from src.shared.database import get_db
 from src.shared.deps import get_authz, get_current_user
 
@@ -26,6 +28,14 @@ def _group_repo() -> MongoGroupRepository:
 
 def _apikey_repo() -> MongoApiKeyRepository:
     return MongoApiKeyRepository(get_db())
+
+
+def _user_repo() -> MongoUserRepository:
+    return MongoUserRepository(get_db())
+
+
+def _scope_query() -> OrgScopeQuery:
+    return OrgScopeQuery(get_db())
 
 
 # ---------------------------------------------------------------------------
@@ -192,8 +202,10 @@ async def list_groups(
     authz: AuthorizationService = Depends(get_authz),
     repo: MongoGroupRepository = Depends(_group_repo),
 ):
-    org = await get_db()["organizations"].find_one({"_id": org_id, "member_ids": user.id})
-    if org is None and not authz.is_superadmin(f"user:{user.id}"):
+    subject = f"user:{user.id}"
+    if not authz.is_superadmin(subject) and not await authz.can_do(
+        subject, "read", "org", str(org_id), org_id=str(org_id)
+    ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     return [_group_resp(g) for g in await repo.find_by_org(org_id)]
 
@@ -319,16 +331,11 @@ async def create_api_key(
     repo: MongoApiKeyRepository = Depends(_apikey_repo),
 ):
     subject = f"user:{user.id}"
-    if not authz.is_superadmin(subject):
-        db = get_db()
-        rule = await db["casbin_rules"].find_one(
-            {"rule.0": subject, "rule.1": {"$in": ["supervisor", "admin"]}}
+    if not authz.is_superadmin(subject) and not await authz.has_elevated_role_anywhere(subject):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires supervisor or admin role in at least one organization",
         )
-        if rule is None:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Requires supervisor or admin role in at least one organization",
-            )
 
     api_key, raw_key = ApiKey.create(
         name=body.name,
@@ -382,12 +389,11 @@ async def delete_api_key(
 
 
 @router.get("/users", response_model=list[UserSummaryResponse])
-async def list_users(user: User = Depends(get_current_user)):
-    db = get_db()
-    return [
-        UserSummaryResponse(id=doc["_id"], email=doc["email"])
-        async for doc in db["iam_users"].find({}, {"_id": 1, "email": 1})
-    ]
+async def list_users(
+    user: User = Depends(get_current_user),
+    repo: MongoUserRepository = Depends(_user_repo),
+):
+    return [UserSummaryResponse(id=u.id, email=u.email) for u in await repo.find_all()]
 
 
 @router.get("/organizations/{org_id}/roles", response_model=list[RoleAssignmentResponse])
@@ -397,49 +403,31 @@ async def list_role_assignments(
     scope_id: UUID | None = Query(None),
     user: User = Depends(get_current_user),
     authz: AuthorizationService = Depends(get_authz),
+    scopes: OrgScopeQuery = Depends(_scope_query),
 ):
     subject = f"user:{user.id}"
-    db = get_db()
 
     if scope_type and scope_id:
         if not await authz.can_do(subject, "read", scope_type, str(scope_id), org_id=str(org_id)):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        domains = [f"{scope_type}:{scope_id}"]
     else:
         if not await authz.can_do(subject, "read", "org", str(org_id), org_id=str(org_id)):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
-
-    if scope_type and scope_id:
-        domains = [f"{scope_type}:{scope_id}"]
-    else:
-        # Collect all scope domains belonging to this org
-        domains = [f"org:{org_id}"]
-        project_ids = [
-            doc["_id"] async for doc in db["projects"].find({"organization_id": org_id}, {"_id": 1})
-        ]
-        domains.extend(f"project:{pid}" for pid in project_ids)
-        subproject_ids = []
-        for pid in project_ids:
-            async for doc in db["subprojects"].find({"project_id": pid}, {"_id": 1}):
-                subproject_ids.append(doc["_id"])
-        domains.extend(f"subproject:{sid}" for sid in subproject_ids)
-        async for doc in db["campaigns"].find({"organization_id": org_id}, {"_id": 1}):
-            domains.append(f"campaign:{doc['_id']}")
+        domains = await scopes.all_domains(org_id)
 
     results = []
-    async for doc in db["casbin_rules"].find({"rule.2": {"$in": domains}}):
-        rule = doc["rule"]
-        if len(rule) == 3:
-            domain = rule[2]
-            sep = domain.find(":")
-            if sep > 0:
-                results.append(
-                    RoleAssignmentResponse(
-                        subject=rule[0],
-                        role=rule[1],
-                        scope_type=domain[:sep],
-                        scope_id=domain[sep + 1 :],
-                    )
+    for sub, role, domain in await authz.list_roles_for_domains(domains):
+        sep = domain.find(":")
+        if sep > 0:
+            results.append(
+                RoleAssignmentResponse(
+                    subject=sub,
+                    role=role,
+                    scope_type=domain[:sep],
+                    scope_id=domain[sep + 1 :],
                 )
+            )
     return results
 
 
@@ -460,36 +448,30 @@ async def my_roles(
     org_id: UUID,
     user: User = Depends(get_current_user),
     authz: AuthorizationService = Depends(get_authz),
+    scopes: OrgScopeQuery = Depends(_scope_query),
 ):
-    db = get_db()
     subject = f"user:{user.id}"
     oid = str(org_id)
 
     org_role = await authz.effective_role(subject, "org", oid, org_id=oid)
 
-    project_ids = [
-        doc["_id"] async for doc in db["projects"].find({"organization_id": org_id}, {"_id": 1})
-    ]
+    pids = await scopes.project_ids(org_id)
     project_roles = {
         str(pid): await authz.effective_role(subject, "project", str(pid), org_id=oid)
-        for pid in project_ids
+        for pid in pids
     }
 
-    subproject_ids = []
-    for pid in project_ids:
-        async for doc in db["subprojects"].find({"project_id": pid}, {"_id": 1}):
-            subproject_ids.append(doc["_id"])
+    sids = await scopes.subproject_ids(pids)
     subproject_roles = {
         str(sid): await authz.effective_role(subject, "subproject", str(sid), org_id=oid)
-        for sid in subproject_ids
+        for sid in sids
     }
 
-    campaign_roles: dict[str, str | None] = {}
-    async for doc in db["campaigns"].find({"organization_id": org_id}, {"_id": 1}):
-        cid = doc["_id"]
-        campaign_roles[str(cid)] = await authz.effective_role(
-            subject, "campaign", str(cid), org_id=oid
-        )
+    cids = await scopes.campaign_ids(org_id)
+    campaign_roles = {
+        str(cid): await authz.effective_role(subject, "campaign", str(cid), org_id=oid)
+        for cid in cids
+    }
 
     return MyRolesResponse(
         org=org_role,

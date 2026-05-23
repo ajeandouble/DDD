@@ -27,6 +27,10 @@ from src.analyzer.api import router as analyzer_router
 from src.storage.api import router as storage_router
 from src.webhooks.api import router as webhooks_router
 from src.webhooks.application import register_handlers as register_webhook_handlers
+from src.webhooks.infrastructure.repositories import (
+    MongoDeliveryRepository,
+    MongoWebhookEndpointRepository,
+)
 from src.billing.api import router as billing_router
 from src.billing.application.event_handlers import register_handlers as register_billing_handlers
 from src.billing.infrastructure.repositories import (
@@ -46,7 +50,10 @@ async def lifespan(app: FastAPI):
     register_conversation_handlers(
         repo_factory=lambda: MongoConversationRepository(database.get_db())
     )
-    register_webhook_handlers()
+    register_webhook_handlers(
+        ep_repo_factory=lambda: MongoWebhookEndpointRepository(database.get_db()),
+        del_repo_factory=lambda: MongoDeliveryRepository(database.get_db()),
+    )
     register_billing_handlers(
         sub_repo_factory=lambda: MongoSubscriptionRepository(database.get_db()),
         usage_repo_factory=lambda: MongoUsageRepository(database.get_db()),

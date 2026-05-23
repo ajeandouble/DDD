@@ -3,6 +3,7 @@ from uuid import UUID
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from src.webhooks.domain import Delivery, DeliveryStatus, WebhookEndpoint
+from src.webhooks.domain.repositories import DeliveryRepository, WebhookEndpointRepository
 
 
 def _ep_to_doc(ep: WebhookEndpoint) -> dict:
@@ -61,7 +62,7 @@ def _del_from_doc(doc: dict) -> Delivery:
     )
 
 
-class MongoWebhookEndpointRepository:
+class MongoWebhookEndpointRepository(WebhookEndpointRepository):
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         self._col = db["webhooks_endpoints"]
 
@@ -91,7 +92,7 @@ class MongoWebhookEndpointRepository:
         await self._col.delete_one({"_id": ep_id})
 
 
-class MongoDeliveryRepository:
+class MongoDeliveryRepository(DeliveryRepository):
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         self._col = db["webhooks_deliveries"]
 

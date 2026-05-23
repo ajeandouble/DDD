@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import traceback
+from typing import Callable
 from uuid import UUID
 
 import warnings
@@ -10,13 +11,9 @@ import httpx
 from RestrictedPython import PrintCollector, compile_restricted, safe_builtins, safe_globals
 
 from src.conversations.domain.events import ConversationTranscribed
-from src.shared.database import get_db
 from src.shared.events import subscribe
 from src.webhooks.domain import Delivery, DeliveryStatus, WebhookEndpoint
-from src.webhooks.infrastructure.repositories import (
-    MongoDeliveryRepository,
-    MongoWebhookEndpointRepository,
-)
+from src.webhooks.domain.repositories import DeliveryRepository, WebhookEndpointRepository
 
 EVENT_CONVERSATION_TRANSCRIBED = "conversation.transcribed"
 
@@ -97,36 +94,39 @@ async def _deliver(ep: WebhookEndpoint, event_type: str, payload: dict) -> Deliv
     return delivery
 
 
-async def on_conversation_transcribed(event: ConversationTranscribed) -> None:
-    db = get_db()
-    ep_repo = MongoWebhookEndpointRepository(db)
-    del_repo = MongoDeliveryRepository(db)
+def register_handlers(
+    ep_repo_factory: Callable[[], WebhookEndpointRepository],
+    del_repo_factory: Callable[[], DeliveryRepository],
+) -> None:
+    async def on_conversation_transcribed(event: ConversationTranscribed) -> None:
+        ep_repo = ep_repo_factory()
+        del_repo = del_repo_factory()
 
-    endpoints = await ep_repo.find_enabled_for_event(EVENT_CONVERSATION_TRANSCRIBED)
-    if not endpoints:
-        return
+        endpoints = await ep_repo.find_enabled_for_event(EVENT_CONVERSATION_TRANSCRIBED)
+        if not endpoints:
+            return
 
-    payload = {
-        "event": EVENT_CONVERSATION_TRANSCRIBED,
-        "conversation_id": str(event.conversation_id),
-        "org_id": str(event.org_id),
-        "title": event.title,
-        "conversation_timestamp": event.conversation_timestamp,
-        "scope_type": event.scope_type,
-        "scope_id": str(event.scope_id) if event.scope_id else None,
-        "metadata": event.metadata,
-        "content": event.speaker_turns,
-        "stats": event.stats,
-    }
+        payload = {
+            "event": EVENT_CONVERSATION_TRANSCRIBED,
+            "conversation_id": str(event.conversation_id),
+            "org_id": str(event.org_id),
+            "title": event.title,
+            "conversation_timestamp": event.conversation_timestamp,
+            "scope_type": event.scope_type,
+            "scope_id": str(event.scope_id) if event.scope_id else None,
+            "metadata": event.metadata,
+            "content": event.speaker_turns,
+            "stats": event.stats,
+        }
 
-    event_scope_id = UUID(payload["scope_id"]) if payload.get("scope_id") else None
-    for ep in endpoints:
-        if not ep.matches_scope(payload.get("scope_type"), event_scope_id):
-            continue
-        delivery = await _deliver(ep, EVENT_CONVERSATION_TRANSCRIBED, payload)
-        await del_repo.save(delivery)
-        print(f"[webhooks] endpoint={ep.id} status={delivery.status} code={delivery.response_code}")
+        event_scope_id = UUID(payload["scope_id"]) if payload.get("scope_id") else None
+        for ep in endpoints:
+            if not ep.matches_scope(payload.get("scope_type"), event_scope_id):
+                continue
+            delivery = await _deliver(ep, EVENT_CONVERSATION_TRANSCRIBED, payload)
+            await del_repo.save(delivery)
+            print(
+                f"[webhooks] endpoint={ep.id} status={delivery.status} code={delivery.response_code}"
+            )
 
-
-def register_handlers() -> None:
     subscribe(ConversationTranscribed, on_conversation_transcribed)

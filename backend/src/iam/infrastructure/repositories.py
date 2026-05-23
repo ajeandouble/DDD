@@ -52,6 +52,10 @@ class MongoUserRepository(MongoRepository, UserRepository):
         doc.pop("_id")
         await self._col.update_one({"_id": user.id}, {"$set": doc})
 
+    async def find_all(self) -> list[User]:
+        docs = await self._col.find({}).to_list(length=2000)
+        return [_user_from_doc(d) for d in docs]
+
 
 # ---------------------------------------------------------------------------
 # Group

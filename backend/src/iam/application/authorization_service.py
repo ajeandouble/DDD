@@ -291,6 +291,22 @@ class AuthorizationService:
         domain = f"{scope_type}:{scope_id}"
         return any(bool(self._e.get_roles_for_user_in_domain(s, domain)) for s in subjects)
 
+    async def has_elevated_role_anywhere(self, subject: str) -> bool:
+        """True if subject holds supervisor or admin in any scope."""
+        doc = await self._col.find_one(
+            {"rule.0": subject, "rule.1": {"$in": ["supervisor", "admin"]}}
+        )
+        return doc is not None
+
+    async def list_roles_for_domains(self, domains: list[str]) -> list[tuple[str, str, str]]:
+        """Return (subject, role, domain) for all assignments in the given domains."""
+        results: list[tuple[str, str, str]] = []
+        async for doc in self._col.find({"rule.2": {"$in": domains}}):
+            rule = doc["rule"]
+            if len(rule) == 3:
+                results.append((rule[0], rule[1], rule[2]))
+        return results
+
     async def grant_superadmin(self, user_id: UUID) -> None:
         """Grant platform-level superadmin — bypasses all scope checks."""
         sub = f"user:{user_id}"

@@ -14,6 +14,9 @@ class UserRepository(ABC):
     @abstractmethod
     async def find_by_id(self, user_id: UUID) -> User | None: ...
 
+    @abstractmethod
+    async def find_all(self) -> list[User]: ...
+
 
 class GroupRepository(ABC):
     @abstractmethod
