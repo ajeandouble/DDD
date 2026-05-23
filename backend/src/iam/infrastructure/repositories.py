@@ -1,8 +1,9 @@
 from uuid import UUID
 
-from src.iam.domain.models import ApiKey, Group, User
+from src.iam.domain.models import ApiKey, Avatar, Group, User
 from src.iam.domain.repositories import (
     ApiKeyRepository,
+    AvatarRepository,
     GroupRepository,
     UserRepository,
 )
@@ -157,3 +158,23 @@ class MongoApiKeyRepository(MongoRepository, ApiKeyRepository):
 
     async def delete(self, key_id: UUID) -> None:
         await self._col.delete_one({"_id": key_id})
+
+
+class MongoAvatarRepository(MongoRepository, AvatarRepository):
+    collection_name = "avatars"
+
+    async def save(self, avatar: Avatar) -> None:
+        await self._col.replace_one(
+            {"_id": avatar.user_id},
+            {"_id": avatar.user_id, "data": avatar.data, "content_type": avatar.content_type},
+            upsert=True,
+        )
+
+    async def find_by_user(self, user_id: UUID) -> Avatar | None:
+        doc = await self._col.find_one({"_id": user_id})
+        if not doc:
+            return None
+        return Avatar(user_id=doc["_id"], data=doc["data"], content_type=doc["content_type"])
+
+    async def delete(self, user_id: UUID) -> None:
+        await self._col.delete_one({"_id": user_id})

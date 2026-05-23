@@ -103,6 +103,17 @@ export const getMe = (): Promise<UserResponse> =>
 export const updatePreferences = (locale: string): Promise<UserResponse> =>
   api.patch("auth/me/preferences", { json: { locale }, headers: authHeaders() }).json();
 
+export const uploadAvatar = (file: File): Promise<UserResponse> => {
+  const form = new FormData();
+  form.append("file", file);
+  return api.put("auth/me/avatar", { body: form, headers: authHeaders() }).json();
+};
+
+export const deleteAvatar = (): Promise<void> =>
+  api.delete("auth/me/avatar", { headers: authHeaders() }).then(() => undefined);
+
+export const avatarUrl = (userId: string): string => `/api/auth/users/${userId}/avatar`;
+
 // --- Tags ---
 
 export interface TagResponse {

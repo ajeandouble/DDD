@@ -86,7 +86,13 @@
     "selectOrgForTags": "Select an organization",
     "noTags": "No tags yet.",
     "newTagPlaceholder": "Tag name",
-    "addTag": "Add tag"
+    "addTag": "Add tag",
+    "avatar": "Profile picture",
+    "avatarDesc": "Drag and drop an image, or click to select. Compressed to ≤ 200 KB automatically.",
+    "avatarRemove": "Remove",
+    "avatarUploading": "Uploading…",
+    "avatarTooLarge": "Image is too large after compression. Please use a smaller image.",
+    "avatarUpdated": "Profile picture updated"
   },
   "scopes": {
     "settings": "Settings",

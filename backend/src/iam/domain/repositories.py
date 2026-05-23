@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from src.iam.domain.models import ApiKey, Group, User
+from src.iam.domain.models import ApiKey, Avatar, Group, User
 
 
 class UserRepository(ABC):
@@ -33,6 +33,17 @@ class GroupRepository(ABC):
 
     @abstractmethod
     async def delete(self, group_id: UUID) -> None: ...
+
+
+class AvatarRepository(ABC):
+    @abstractmethod
+    async def save(self, avatar: Avatar) -> None: ...
+
+    @abstractmethod
+    async def find_by_user(self, user_id: UUID) -> Avatar | None: ...
+
+    @abstractmethod
+    async def delete(self, user_id: UUID) -> None: ...
 
 
 class ApiKeyRepository(ABC):

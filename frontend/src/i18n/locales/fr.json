@@ -86,7 +86,13 @@
     "selectOrgForTags": "Sélectionner une organisation",
     "noTags": "Aucune étiquette pour l'instant.",
     "newTagPlaceholder": "Nom de l'étiquette",
-    "addTag": "Ajouter une étiquette"
+    "addTag": "Ajouter une étiquette",
+    "avatar": "Photo de profil",
+    "avatarDesc": "Glissez-déposez une image ou cliquez pour sélectionner. Compressée automatiquement à ≤ 200 Ko.",
+    "avatarRemove": "Supprimer",
+    "avatarUploading": "Envoi…",
+    "avatarTooLarge": "Image trop volumineuse. Veuillez utiliser une image plus petite.",
+    "avatarUpdated": "Photo de profil mise à jour"
   },
   "scopes": {
     "settings": "Paramètres",

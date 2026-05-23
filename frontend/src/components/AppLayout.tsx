@@ -2,6 +2,7 @@ import { Navigate, Outlet, Link, useNavigate, useMatch } from "react-router-dom"
 import {
   AppShell,
   ActionIcon,
+  Avatar,
   Group,
   Text,
   Button,
@@ -16,7 +17,7 @@ import {
 import { useDisclosure } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { getOrganizations, getMe } from "../lib/api";
+import { getOrganizations, getMe, avatarUrl } from "../lib/api";
 
 export function AppLayout() {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ export function AppLayout() {
     retry: false,
   });
 
-  useQuery({
+  const { data: me } = useQuery({
     queryKey: ["me"],
     queryFn: getMe,
     retry: false,
@@ -85,6 +86,16 @@ export function AppLayout() {
             >
               {computed === "dark" ? "☀" : "☽"}
             </ActionIcon>
+            <Avatar
+              src={me?.has_avatar ? avatarUrl(me.id) : undefined}
+              size={28}
+              radius="xl"
+              color="blue"
+              style={{ cursor: "pointer" }}
+              onClick={() => navigate("/settings")}
+            >
+              {me?.email?.[0]?.toUpperCase()}
+            </Avatar>
             <Button variant="subtle" size="xs" color="gray" onClick={handleSignOut}>
               {t("nav.signOut")}
             </Button>

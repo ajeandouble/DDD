@@ -12,10 +12,12 @@
   },
   "dependencies": {
     "@mantine/core": "^9.2.1",
+    "@mantine/dropzone": "^9.2.1",
     "@mantine/hooks": "^9.2.1",
     "@mantine/notifications": "^9.2.1",
     "@tabler/icons-react": "^3.44.0",
     "@tanstack/react-query": "^5.100.10",
+    "browser-image-compression": "^2.0.2",
     "i18next": "^26.2.0",
     "ky": "^2.0.2",
     "react": "^19.2.6",

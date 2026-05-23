@@ -103,5 +103,16 @@ class ApiKey:
         return hashlib.sha256(raw_key.encode()).hexdigest()
 
 
+@dataclass
+class Avatar:
+    user_id: UUID
+    data: str  # base64-encoded image bytes
+    content_type: str  # e.g. "image/jpeg"
+
+    @classmethod
+    def create(cls, user_id: UUID, data: str, content_type: str) -> "Avatar":
+        return cls(user_id=user_id, data=data, content_type=content_type)
+
+
 # Union type for request authentication
 Principal = User | ApiKey

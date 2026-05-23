@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LOCALES } from "../i18n";
@@ -18,8 +18,12 @@ import {
   Divider,
   Alert,
   ActionIcon,
+  Avatar,
 } from "@mantine/core";
+import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { useDisclosure } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
+import imageCompression from "browser-image-compression";
 import {
   listApiKeys,
   createApiKey,
@@ -31,6 +35,9 @@ import {
   getMyRoles,
   getMe,
   updatePreferences,
+  uploadAvatar,
+  deleteAvatar,
+  avatarUrl,
   listTags,
   createTag,
   deleteTag,
@@ -96,6 +103,46 @@ export function SettingsPage() {
     enabled: !!tagOrgId,
   });
   const tagOrgRole = tagOrgId ? getEffectiveRole("org", tagOrgId, tagOrgRoles) : null;
+
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const avatarMutation = useMutation({
+    mutationFn: uploadAvatar,
+    onSuccess: (user) => {
+      qc.setQueryData(["me"], user);
+      notifications.show({ color: "green", message: t("settings.avatarUpdated") });
+    },
+  });
+
+  const deleteAvatarMutation = useMutation({
+    mutationFn: deleteAvatar,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
+  });
+
+  const handleAvatarDrop = useCallback(
+    async (files: File[]) => {
+      const file = files[0];
+      if (!file) return;
+      setAvatarUploading(true);
+      try {
+        const compressed = await imageCompression(file, {
+          maxSizeMB: 0.2,
+          maxWidthOrHeight: 256,
+          useWebWorker: true,
+        });
+        if (compressed.size > 400 * 1024) {
+          notifications.show({ color: "red", message: t("settings.avatarTooLarge") });
+          return;
+        }
+        await avatarMutation.mutateAsync(
+          new File([compressed], file.name, { type: compressed.type })
+        );
+      } finally {
+        setAvatarUploading(false);
+      }
+    },
+    [avatarMutation, t]
+  );
 
   const createTagMutation = useMutation({
     mutationFn: () => createTag(tagOrgId!, newTagName.trim()),
@@ -199,6 +246,51 @@ export function SettingsPage() {
   return (
     <Stack gap="lg" maw={800}>
       <Title order={2}>{t("settings.title")}</Title>
+
+      <Stack gap="xs">
+        <Text fw={600} size="lg">
+          {t("settings.avatar")}
+        </Text>
+        <Text size="sm" c="dimmed">
+          {t("settings.avatarDesc")}
+        </Text>
+        <Group align="flex-start" gap="md">
+          <Avatar
+            src={me?.has_avatar ? avatarUrl(me.id) : undefined}
+            size={80}
+            radius="xl"
+            color="blue"
+          >
+            {me?.email?.[0]?.toUpperCase()}
+          </Avatar>
+          <Stack gap="xs" style={{ flex: 1 }}>
+            <Dropzone
+              onDrop={handleAvatarDrop}
+              accept={IMAGE_MIME_TYPE}
+              maxSize={5 * 1024 * 1024}
+              loading={avatarUploading}
+              styles={{ root: { padding: "12px 16px" } }}
+            >
+              <Text size="sm" c="dimmed" ta="center">
+                {t("settings.avatarDesc")}
+              </Text>
+            </Dropzone>
+            {me?.has_avatar && (
+              <Button
+                variant="subtle"
+                color="red"
+                size="xs"
+                loading={deleteAvatarMutation.isPending}
+                onClick={() => deleteAvatarMutation.mutate()}
+              >
+                {t("settings.avatarRemove")}
+              </Button>
+            )}
+          </Stack>
+        </Group>
+      </Stack>
+
+      <Divider />
 
       <Stack gap="xs">
         <Text fw={600} size="lg">

@@ -86,7 +86,13 @@
     "selectOrgForTags": "組織を選択",
     "noTags": "タグはまだありません。",
     "newTagPlaceholder": "タグ名",
-    "addTag": "タグを追加"
+    "addTag": "タグを追加",
+    "avatar": "プロフィール写真",
+    "avatarDesc": "画像をドラッグするか、クリックして選択してください。自動的に ≤ 200 KB に圧縮されます。",
+    "avatarRemove": "削除",
+    "avatarUploading": "アップロード中…",
+    "avatarTooLarge": "圧縮後も画像が大きすぎます。より小さな画像を使用してください。",
+    "avatarUpdated": "プロフィール写真を更新しました"
   },
   "scopes": {
     "settings": "設定",
