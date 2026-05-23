@@ -14,6 +14,8 @@ def _ep_to_doc(ep: WebhookEndpoint) -> dict:
         "event_types": ep.event_types,
         "transformer": ep.transformer,
         "enabled": ep.enabled,
+        "trigger_scope": ep.trigger_scope,
+        "trigger_scope_id": ep.trigger_scope_id,
         "created_at": ep.created_at,
     }
 
@@ -27,6 +29,8 @@ def _ep_from_doc(doc: dict) -> WebhookEndpoint:
         event_types=doc.get("event_types", ["conversation.transcribed"]),
         transformer=doc.get("transformer", "result = payload"),
         enabled=doc.get("enabled", True),
+        trigger_scope=doc.get("trigger_scope"),
+        trigger_scope_id=doc.get("trigger_scope_id"),
         created_at=doc["created_at"],
     )
 

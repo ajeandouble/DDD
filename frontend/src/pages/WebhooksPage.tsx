@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -29,10 +29,14 @@ import {
   testTransformer,
   getSubscription,
   upgradeSubscription,
+  getProjects,
+  getSubprojects,
+  getCampaigns,
 } from "../lib/api";
 import type { WebhookEndpoint, Delivery } from "../dto/webhooks";
 import { useMyRoles } from "../hooks/useMyRoles";
 import { useTranslation } from "react-i18next";
+import { notifications } from "@mantine/notifications";
 
 const DEFAULT_SAMPLE_PAYLOAD = JSON.stringify(
   {
@@ -226,6 +230,15 @@ function EndpointRow({
                 {et}
               </Badge>
             ))}
+            {ep.trigger_scope ? (
+              <Badge size="xs" variant="light" color="violet">
+                {ep.trigger_scope}:{ep.trigger_scope_id?.slice(0, 8)}…
+              </Badge>
+            ) : (
+              <Badge size="xs" variant="light" color="gray">
+                org-wide
+              </Badge>
+            )}
           </Group>
           <Text size="xs" c="dimmed">
             {new Date(ep.created_at).toLocaleString()}
@@ -390,6 +403,194 @@ function TransformerSection({
   );
 }
 
+const TRIGGER_SCOPE_OPTIONS = [
+  { value: "", label: "Org-wide (all conversations)" },
+  { value: "project", label: "Project" },
+  { value: "subproject", label: "Subproject" },
+  { value: "campaign", label: "Campaign" },
+];
+
+function ScopeSelector({
+  orgId,
+  triggerScope,
+  onTriggerScopeChange,
+  triggerScopeId,
+  onTriggerScopeIdChange,
+  opened,
+}: {
+  orgId: string;
+  triggerScope: string;
+  onTriggerScopeChange: (v: string) => void;
+  triggerScopeId: string;
+  onTriggerScopeIdChange: (v: string) => void;
+  opened: boolean;
+}) {
+  const [projectId, setProjectId] = useState("");
+  const [subprojectId, setSubprojectId] = useState("");
+
+  const { data: projects } = useQuery({
+    queryKey: ["projects", orgId],
+    queryFn: () => getProjects(orgId),
+    enabled:
+      opened &&
+      (triggerScope === "project" || triggerScope === "subproject" || triggerScope === "campaign"),
+  });
+
+  const { data: subprojects } = useQuery({
+    queryKey: ["subprojects", projectId],
+    queryFn: () => getSubprojects(projectId),
+    enabled:
+      opened && !!projectId && (triggerScope === "subproject" || triggerScope === "campaign"),
+  });
+
+  const { data: campaigns } = useQuery({
+    queryKey: ["campaigns", subprojectId],
+    queryFn: () => getCampaigns(subprojectId),
+    enabled: opened && !!subprojectId && triggerScope === "campaign",
+  });
+
+  const handleScopeTypeChange = (v: string) => {
+    onTriggerScopeChange(v);
+    onTriggerScopeIdChange("");
+    setProjectId("");
+    setSubprojectId("");
+  };
+
+  return (
+    <Stack gap="xs">
+      <Select
+        label="Trigger scope"
+        data={TRIGGER_SCOPE_OPTIONS}
+        value={triggerScope}
+        onChange={(v) => handleScopeTypeChange(v ?? "")}
+      />
+      {(triggerScope === "project" ||
+        triggerScope === "subproject" ||
+        triggerScope === "campaign") && (
+        <Select
+          label="Project"
+          placeholder="Select project"
+          data={projects?.map((p) => ({ value: p.id, label: p.name })) ?? []}
+          value={projectId}
+          onChange={(v) => {
+            setProjectId(v ?? "");
+            setSubprojectId("");
+            onTriggerScopeIdChange("");
+            if (triggerScope === "project") onTriggerScopeIdChange(v ?? "");
+          }}
+          required
+        />
+      )}
+      {(triggerScope === "subproject" || triggerScope === "campaign") && projectId && (
+        <Select
+          label="Subproject"
+          placeholder="Select subproject"
+          data={subprojects?.map((s) => ({ value: s.id, label: s.name })) ?? []}
+          value={subprojectId}
+          onChange={(v) => {
+            setSubprojectId(v ?? "");
+            onTriggerScopeIdChange("");
+            if (triggerScope === "subproject") onTriggerScopeIdChange(v ?? "");
+          }}
+          required
+        />
+      )}
+      {triggerScope === "campaign" && subprojectId && (
+        <Select
+          label="Campaign"
+          placeholder="Select campaign"
+          data={campaigns?.map((c) => ({ value: c.id, label: c.name })) ?? []}
+          value={triggerScopeId}
+          onChange={(v) => onTriggerScopeIdChange(v ?? "")}
+          required
+        />
+      )}
+    </Stack>
+  );
+}
+
+function splitUrl(full: string): [string, string] {
+  if (full.startsWith("https://")) return ["https://", full.slice(8)];
+  return ["http://", full.startsWith("http://") ? full.slice(7) : full];
+}
+
+const IP_LIKE = /^(\d{1,3}\.){3}\d{1,3}$|^localhost$/i;
+
+function needsPort(host: string): boolean {
+  const bare = host.split("/")[0]; // strip path
+  return IP_LIKE.test(bare) && !bare.includes(":");
+}
+
+function UrlInput({
+  label,
+  scheme,
+  onSchemeChange,
+  host,
+  onHostChange,
+  placeholder,
+  error,
+}: {
+  label: string;
+  scheme: string;
+  onSchemeChange: (v: string) => void;
+  host: string;
+  onHostChange: (v: string) => void;
+  placeholder?: string;
+  error?: string | null;
+}) {
+  const [portError, setPortError] = useState<string | null>(null);
+  const toastedRef = useRef(false);
+
+  const handleChange = (v: string) => {
+    setPortError(null);
+    toastedRef.current = false;
+    onHostChange(v);
+  };
+
+  const handleBlur = () => {
+    if (host && needsPort(host)) {
+      setPortError("No port specified — e.g. 127.0.0.1:4000");
+      if (!toastedRef.current) {
+        toastedRef.current = true;
+        notifications.show({
+          color: "red",
+          title: "Missing port",
+          message: `"${host}" looks like a local address — add a port (e.g. :4000)`,
+          autoClose: 4000,
+        });
+      }
+    }
+  };
+
+  const displayError = portError ?? error;
+
+  return (
+    <div>
+      <Text size="sm" fw={500} mb={4}>
+        {label}
+      </Text>
+      <Group gap={0} align="flex-start">
+        <Select
+          data={["http://", "https://"]}
+          value={scheme}
+          onChange={(v) => v && onSchemeChange(v)}
+          style={{ width: 110 }}
+          styles={{ input: { borderRadius: "4px 0 0 4px", borderRight: "none" } }}
+        />
+        <TextInput
+          value={host}
+          onChange={(e) => handleChange(e.currentTarget.value)}
+          onBlur={handleBlur}
+          placeholder={placeholder ?? "127.0.0.1:4000/hook"}
+          error={displayError}
+          style={{ flex: 1 }}
+          styles={{ input: { borderRadius: "0 4px 4px 0" } }}
+        />
+      </Group>
+    </div>
+  );
+}
+
 function CreateModal({
   orgId,
   opened,
@@ -402,36 +603,81 @@ function CreateModal({
   onCreated: () => void;
 }) {
   const { t } = useTranslation();
-  const [url, setUrl] = useState("");
+  const [scheme, setScheme] = useState("http://");
+  const [urlHost, setUrlHost] = useState("");
+  const [urlError, setUrlError] = useState<string | null>(null);
   const [secret, setSecret] = useState("");
   const [transformer, setTransformer] = useState(DEFAULT_TRANSFORMER);
+  const [transformerError, setTransformerError] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
+  const [triggerScope, setTriggerScope] = useState("");
+  const [triggerScopeId, setTriggerScopeId] = useState("");
+
+  const fullUrl = scheme + urlHost;
 
   const mutation = useMutation({
     mutationFn: () =>
       createWebhookEndpoint(orgId, {
-        url,
+        url: fullUrl,
         secret,
         event_types: ["conversation.transcribed"],
         transformer,
         enabled: true,
+        trigger_scope: triggerScope || null,
+        trigger_scope_id: triggerScope && triggerScopeId ? triggerScopeId : null,
       }),
     onSuccess: () => {
       onCreated();
       onClose();
-      setUrl("");
+      setScheme("http://");
+      setUrlHost("");
       setSecret("");
       setTransformer(DEFAULT_TRANSFORMER);
+      setTransformerError(null);
+      setUrlError(null);
+      setTriggerScope("");
+      setTriggerScopeId("");
     },
   });
+
+  const scopeIncomplete = triggerScope !== "" && !triggerScopeId;
+
+  const handleCreate = async () => {
+    setUrlError(null);
+    setTransformerError(null);
+    try {
+      new URL(fullUrl);
+    } catch {
+      setUrlError("Enter a valid URL (e.g. 127.0.0.1:4000/hook)");
+      return;
+    }
+    setValidating(true);
+    try {
+      const r = await testTransformer(transformer, JSON.parse(DEFAULT_SAMPLE_PAYLOAD));
+      if (r.error) {
+        setTransformerError(r.error);
+        return;
+      }
+    } catch {
+      setTransformerError("Failed to validate transformer");
+      return;
+    } finally {
+      setValidating(false);
+    }
+    mutation.mutate();
+  };
 
   return (
     <Modal opened={opened} onClose={onClose} title={t("webhooks.newTitle")} size="lg" centered>
       <Stack>
-        <TextInput
+        <UrlInput
           label={t("webhooks.urlLabel")}
+          scheme={scheme}
+          onSchemeChange={setScheme}
+          host={urlHost}
+          onHostChange={setUrlHost}
           placeholder={t("webhooks.urlPlaceholder")}
-          value={url}
-          onChange={(e) => setUrl(e.currentTarget.value)}
+          error={urlError}
         />
         <TextInput
           label={t("webhooks.secretLabel")}
@@ -445,13 +691,32 @@ function CreateModal({
           value="conversation.transcribed"
           readOnly
         />
+        <ScopeSelector
+          orgId={orgId}
+          triggerScope={triggerScope}
+          onTriggerScopeChange={setTriggerScope}
+          triggerScopeId={triggerScopeId}
+          onTriggerScopeIdChange={setTriggerScopeId}
+          opened={opened}
+        />
         <TransformerSection transformer={transformer} onTransformerChange={setTransformer} />
+        {transformerError && (
+          <Alert color="red" title="Transformer error">
+            <Code block style={{ fontSize: 11, whiteSpace: "pre-wrap" }}>
+              {transformerError}
+            </Code>
+          </Alert>
+        )}
         {mutation.isError && <Alert color="red">{String(mutation.error)}</Alert>}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={!url}>
+          <Button
+            onClick={handleCreate}
+            loading={validating || mutation.isPending}
+            disabled={!urlHost || scopeIncomplete}
+          >
             {t("webhooks.createBtn")}
           </Button>
         </Group>
@@ -474,37 +739,100 @@ function EditModal({
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
-  const [url, setUrl] = useState(ep.url);
+  const [scheme, setScheme] = useState(() => splitUrl(ep.url)[0]);
+  const [urlHost, setUrlHost] = useState(() => splitUrl(ep.url)[1]);
+  const [urlError, setUrlError] = useState<string | null>(null);
   const [secret, setSecret] = useState(ep.secret);
   const [transformer, setTransformer] = useState(ep.transformer);
+  const [transformerError, setTransformerError] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
+  const [triggerScope, setTriggerScope] = useState(ep.trigger_scope ?? "");
+  const [triggerScopeId, setTriggerScopeId] = useState(ep.trigger_scope_id ?? "");
+
+  const fullUrl = scheme + urlHost;
+  const scopeIncomplete = triggerScope !== "" && !triggerScopeId;
 
   const mutation = useMutation({
-    mutationFn: () => updateWebhookEndpoint(orgId, ep.id, { url, secret, transformer }),
+    mutationFn: () =>
+      updateWebhookEndpoint(orgId, ep.id, {
+        url: fullUrl,
+        secret,
+        transformer,
+        trigger_scope: triggerScope || null,
+        trigger_scope_id: triggerScope && triggerScopeId ? triggerScopeId : null,
+      }),
     onSuccess: () => {
       onSaved();
       onClose();
     },
   });
 
+  const handleSave = async () => {
+    setUrlError(null);
+    setTransformerError(null);
+    try {
+      new URL(fullUrl);
+    } catch {
+      setUrlError("Enter a valid URL (e.g. 127.0.0.1:4000/hook)");
+      return;
+    }
+    setValidating(true);
+    try {
+      const r = await testTransformer(transformer, JSON.parse(DEFAULT_SAMPLE_PAYLOAD));
+      if (r.error) {
+        setTransformerError(r.error);
+        return;
+      }
+    } catch {
+      setTransformerError("Failed to validate transformer");
+      return;
+    } finally {
+      setValidating(false);
+    }
+    mutation.mutate();
+  };
+
   return (
     <Modal opened={opened} onClose={onClose} title={t("webhooks.editTitle")} size="lg" centered>
       <Stack>
-        <TextInput
+        <UrlInput
           label={t("webhooks.urlLabel")}
-          value={url}
-          onChange={(e) => setUrl(e.currentTarget.value)}
+          scheme={scheme}
+          onSchemeChange={setScheme}
+          host={urlHost}
+          onHostChange={setUrlHost}
+          error={urlError}
         />
         <TextInput
           label={t("webhooks.secretLabel")}
           value={secret}
           onChange={(e) => setSecret(e.currentTarget.value)}
         />
+        <ScopeSelector
+          orgId={orgId}
+          triggerScope={triggerScope}
+          onTriggerScopeChange={setTriggerScope}
+          triggerScopeId={triggerScopeId}
+          onTriggerScopeIdChange={setTriggerScopeId}
+          opened={opened}
+        />
         <TransformerSection transformer={transformer} onTransformerChange={setTransformer} />
+        {transformerError && (
+          <Alert color="red" title="Transformer error">
+            <Code block style={{ fontSize: 11, whiteSpace: "pre-wrap" }}>
+              {transformerError}
+            </Code>
+          </Alert>
+        )}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={() => mutation.mutate()} loading={mutation.isPending}>
+          <Button
+            onClick={handleSave}
+            loading={validating || mutation.isPending}
+            disabled={scopeIncomplete}
+          >
             {t("webhooks.saveBtn")}
           </Button>
         </Group>

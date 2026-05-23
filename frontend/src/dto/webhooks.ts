@@ -8,6 +8,8 @@ export const WebhookEndpoint = z.object({
   event_types: z.array(z.string()),
   transformer: z.string(),
   enabled: z.boolean(),
+  trigger_scope: z.string().nullable(),
+  trigger_scope_id: z.string().uuid().nullable(),
   created_at: z.string(),
 });
 

@@ -37,12 +37,17 @@ async def _require_admin(org_id: UUID, user: User, authz: AuthorizationService) 
 # --- Schemas ---
 
 
+SUPPORTED_TRIGGER_SCOPES = {"project", "subproject", "campaign"}
+
+
 class EndpointCreate(BaseModel):
     url: str
     secret: str = ""
     event_types: list[str] = ["conversation.transcribed"]
     transformer: str = "result = payload"
     enabled: bool = True
+    trigger_scope: str | None = None
+    trigger_scope_id: UUID | None = None
 
 
 class EndpointUpdate(BaseModel):
@@ -51,6 +56,8 @@ class EndpointUpdate(BaseModel):
     event_types: list[str] | None = None
     transformer: str | None = None
     enabled: bool | None = None
+    trigger_scope: str | None = None
+    trigger_scope_id: UUID | None = None
 
 
 class EndpointResponse(BaseModel):
@@ -61,6 +68,8 @@ class EndpointResponse(BaseModel):
     event_types: list[str]
     transformer: str
     enabled: bool
+    trigger_scope: str | None
+    trigger_scope_id: UUID | None
     created_at: str
 
 
@@ -86,6 +95,22 @@ class TransformerTestResponse(BaseModel):
     stdout: str
 
 
+_VALIDATION_PAYLOAD = {
+    "event": "conversation.transcribed",
+    "conversation_id": "00000000-0000-0000-0000-000000000000",
+    "org_id": "00000000-0000-0000-0000-000000000002",
+    "title": "Test",
+    "content": [{"speaker": "A", "text": "hello", "words": []}],
+    "stats": {"word_count": 1, "duration_seconds": 1.0},
+}
+
+
+def _validate_transformer(transformer: str) -> None:
+    _, error, _ = run_transformer(transformer, _VALIDATION_PAYLOAD)
+    if error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error)
+
+
 def _ep_resp(ep: WebhookEndpoint) -> EndpointResponse:
     return EndpointResponse(
         id=ep.id,
@@ -95,6 +120,8 @@ def _ep_resp(ep: WebhookEndpoint) -> EndpointResponse:
         event_types=ep.event_types,
         transformer=ep.transformer,
         enabled=ep.enabled,
+        trigger_scope=ep.trigger_scope,
+        trigger_scope_id=ep.trigger_scope_id,
         created_at=ep.created_at.isoformat(),
     )
 
@@ -135,6 +162,11 @@ async def create_endpoint(
     for et in body.event_types:
         if et not in SUPPORTED_EVENTS:
             raise HTTPException(400, f"Unknown event type: {et}")
+    if body.trigger_scope is not None and body.trigger_scope not in SUPPORTED_TRIGGER_SCOPES:
+        raise HTTPException(400, f"Invalid trigger_scope: {body.trigger_scope}")
+    if body.trigger_scope is not None and body.trigger_scope_id is None:
+        raise HTTPException(400, "trigger_scope_id required when trigger_scope is set")
+    _validate_transformer(body.transformer)
     ep = WebhookEndpoint.create(
         org_id=org_id,
         url=body.url,
@@ -143,6 +175,8 @@ async def create_endpoint(
     )
     ep.event_types = body.event_types
     ep.enabled = body.enabled
+    ep.trigger_scope = body.trigger_scope
+    ep.trigger_scope_id = body.trigger_scope_id
     await repo.save(ep)
     return _ep_resp(ep)
 
@@ -167,9 +201,17 @@ async def update_endpoint(
     if body.event_types is not None:
         ep.event_types = body.event_types
     if body.transformer is not None:
+        _validate_transformer(body.transformer)
         ep.transformer = body.transformer
     if body.enabled is not None:
         ep.enabled = body.enabled
+    if "trigger_scope" in body.model_fields_set:
+        if body.trigger_scope is not None and body.trigger_scope not in SUPPORTED_TRIGGER_SCOPES:
+            raise HTTPException(400, f"Invalid trigger_scope: {body.trigger_scope}")
+        if body.trigger_scope is not None and body.trigger_scope_id is None:
+            raise HTTPException(400, "trigger_scope_id required when trigger_scope is set")
+        ep.trigger_scope = body.trigger_scope
+        ep.trigger_scope_id = body.trigger_scope_id
     await repo.update(ep)
     return _ep_resp(ep)
 

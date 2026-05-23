@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import traceback
+from uuid import UUID
 
 import warnings
 
@@ -118,7 +119,10 @@ async def on_conversation_transcribed(event: ConversationTranscribed) -> None:
         "stats": event.stats,
     }
 
+    event_scope_id = UUID(payload["scope_id"]) if payload.get("scope_id") else None
     for ep in endpoints:
+        if not ep.matches_scope(payload.get("scope_type"), event_scope_id):
+            continue
         delivery = await _deliver(ep, EVENT_CONVERSATION_TRANSCRIBED, payload)
         await del_repo.save(delivery)
         print(f"[webhooks] endpoint={ep.id} status={delivery.status} code={delivery.response_code}")

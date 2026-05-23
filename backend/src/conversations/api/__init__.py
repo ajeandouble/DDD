@@ -207,6 +207,17 @@ async def list_conversations(
     ]
 
 
+@router.get("/{conversation_id}", response_model=ConversationResponse)
+async def get_conversation(
+    conversation_id: UUID,
+    queries: ConversationQueryHandler = Depends(_queries),
+):
+    c = await queries.get_by_id(conversation_id)
+    if c is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    return _to_response(c)
+
+
 @router.post("/search", response_model=PagedConversations)
 async def search_conversations(
     body: SearchBody,
@@ -236,17 +247,6 @@ async def search_conversations(
         page=result.page,
         page_size=result.page_size,
     )
-
-
-@router.get("/{conversation_id}", response_model=ConversationResponse)
-async def get_conversation(
-    conversation_id: UUID,
-    queries: ConversationQueryHandler = Depends(_queries),
-):
-    c = await queries.get_by_id(conversation_id)
-    if c is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
-    return _to_response(c)
 
 
 # --- Commands ---

@@ -332,6 +332,8 @@ export const createWebhookEndpoint = (
     event_types: string[];
     transformer: string;
     enabled: boolean;
+    trigger_scope?: string | null;
+    trigger_scope_id?: string | null;
   }
 ): Promise<WebhookEndpoint> =>
   api
@@ -347,6 +349,8 @@ export const updateWebhookEndpoint = (
     event_types: string[];
     transformer: string;
     enabled: boolean;
+    trigger_scope: string | null;
+    trigger_scope_id: string | null;
   }>
 ): Promise<WebhookEndpoint> =>
   api
