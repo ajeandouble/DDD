@@ -414,7 +414,7 @@ export const uploadAudio = (
 
 // --- Billing ---
 
-import type { SubscriptionResponse, UsageRecordResponse } from "../dto/billing";
+import type { InvoiceResponse, SubscriptionResponse, UsageRecordResponse } from "../dto/billing";
 
 export const getSubscription = (orgId: string): Promise<SubscriptionResponse> =>
   api.get(`billing/organizations/${orgId}/subscription`, { headers: authHeaders() }).json();
@@ -429,3 +429,42 @@ export const upgradeSubscription = (orgId: string, tier: string): Promise<Subscr
 
 export const getUsage = (orgId: string): Promise<UsageRecordResponse[]> =>
   api.get(`billing/organizations/${orgId}/usage`, { headers: authHeaders() }).json();
+
+export const getInvoices = (orgId: string): Promise<InvoiceResponse[]> =>
+  api.get(`billing/organizations/${orgId}/invoices`, { headers: authHeaders() }).json();
+
+// --- Scheduler ---
+
+export interface CronJobResponse {
+  id: string;
+  name: string;
+  cron_expr: string;
+  enabled: boolean;
+  last_run_at: string | null;
+  next_run_at: string | null;
+  created_at: string;
+}
+
+export interface JobRunResponse {
+  id: string;
+  job_name: string;
+  started_at: string;
+  finished_at: string | null;
+  status: string;
+  logs: string[];
+}
+
+export const listSchedulerJobs = (): Promise<CronJobResponse[]> =>
+  api.get("scheduler/jobs", { headers: authHeaders() }).json();
+
+export const updateSchedulerJob = (
+  jobId: string,
+  body: { cron_expr?: string; enabled?: boolean }
+): Promise<CronJobResponse> =>
+  api.patch(`scheduler/jobs/${jobId}`, { json: body, headers: authHeaders() }).json();
+
+export const triggerSchedulerJob = (jobId: string): Promise<JobRunResponse> =>
+  api.post(`scheduler/jobs/${jobId}/trigger`, { headers: authHeaders() }).json();
+
+export const listJobRuns = (jobId: string): Promise<JobRunResponse[]> =>
+  api.get(`scheduler/jobs/${jobId}/runs`, { headers: authHeaders() }).json();

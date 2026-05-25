@@ -20,6 +20,7 @@ export const UserResponse = z.object({
   email: z.string(),
   locale: z.string().default("en"),
   has_avatar: z.boolean().default(false),
+  is_superadmin: z.boolean().default(false),
   created_at: z.string(),
 });
 

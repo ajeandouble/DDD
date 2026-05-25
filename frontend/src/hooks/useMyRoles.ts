@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getMyRoles } from "../lib/api";
+import { getMe, getMyRoles } from "../lib/api";
 import {
   getEffectiveRole,
   canManageMembers,
@@ -36,4 +36,9 @@ export function useCanAdmin(
   if (!data || !scopeId) return false;
   const role: Role | null = getEffectiveRole(scopeType, scopeId, data);
   return canAdmin(role);
+}
+
+export function useIsSuperAdmin(): boolean {
+  const { data } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  return data?.is_superadmin ?? false;
 }

@@ -9,7 +9,7 @@ from src.iam.application.auth_service import AuthError, AuthService
 from src.iam.domain.models import Avatar, User
 from src.iam.infrastructure.repositories import MongoAvatarRepository, MongoUserRepository
 from src.shared.database import get_db
-from src.shared.deps import get_current_user
+from src.shared.deps import get_authz, get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -41,6 +41,7 @@ class UserResponse(BaseModel):
     email: str
     locale: str
     has_avatar: bool = False
+    is_superadmin: bool = False
     created_at: str
 
 
@@ -66,12 +67,13 @@ async def login(body: Credentials, svc: AuthService = Depends(_auth_service)):
     return TokenResponse(access_token=token)
 
 
-def _user_resp(user: User, has_avatar: bool = False) -> UserResponse:
+def _user_resp(user: User, has_avatar: bool = False, is_superadmin: bool = False) -> UserResponse:
     return UserResponse(
         id=user.id,
         email=user.email,
         locale=user.locale,
         has_avatar=has_avatar,
+        is_superadmin=is_superadmin,
         created_at=user.created_at.isoformat(),
     )
 
@@ -80,9 +82,12 @@ def _user_resp(user: User, has_avatar: bool = False) -> UserResponse:
 async def me(
     user: User = Depends(get_current_user),
     avatar_repo: MongoAvatarRepository = Depends(_avatar_repo),
+    authz=Depends(get_authz),
 ):
     has_avatar = await avatar_repo.find_by_user(user.id) is not None
-    return _user_resp(user, has_avatar=has_avatar)
+    return _user_resp(
+        user, has_avatar=has_avatar, is_superadmin=authz.is_superadmin(f"user:{user.id}")
+    )
 
 
 @router.patch("/me/preferences", response_model=UserResponse)
@@ -91,6 +96,7 @@ async def update_preferences(
     user: User = Depends(get_current_user),
     repo: MongoUserRepository = Depends(_user_repo),
     avatar_repo: MongoAvatarRepository = Depends(_avatar_repo),
+    authz=Depends(get_authz),
 ):
     try:
         user.set_locale(body.locale)
@@ -98,7 +104,9 @@ async def update_preferences(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     await repo.update(user)
     has_avatar = await avatar_repo.find_by_user(user.id) is not None
-    return _user_resp(user, has_avatar=has_avatar)
+    return _user_resp(
+        user, has_avatar=has_avatar, is_superadmin=authz.is_superadmin(f"user:{user.id}")
+    )
 
 
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}

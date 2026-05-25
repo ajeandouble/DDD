@@ -290,7 +290,12 @@
     "webhooksIncluded": "✓ Webhook",
     "webhooksExcluded": "✗ 无 Webhook",
     "current": "当前",
-    "simPaymentInfo": "模拟支付 — 不会产生真实费用。"
+    "simPaymentInfo": "模拟支付 — 不会产生真实费用。",
+    "invoices": "发票",
+    "noInvoices": "尚无已生成的发票。",
+    "period": "周期",
+    "lineItems": "明细",
+    "generatedAt": "生成时间"
   },
   "conversation": {
     "editTitle": "编辑对话",
@@ -313,5 +318,21 @@
     "project": "项目",
     "subproject": "子项目",
     "campaign": "活动"
+  },
+  "scheduler": {
+    "title": "调度器",
+    "noRuns": "暂无运行记录。",
+    "noLogs": "暂无日志。",
+    "lastRun": "上次运行",
+    "nextRun": "下次运行",
+    "trigger": "立即运行",
+    "editCron": "编辑计划",
+    "showRuns": "显示运行记录",
+    "hideRuns": "隐藏运行记录",
+    "invalidCron": "无效的cron表达式",
+    "refAny": "任意值",
+    "refList": "值列表",
+    "refRange": "值范围",
+    "refStep": "步长"
   }
 }

@@ -1,10 +1,14 @@
-from datetime import timezone
+from datetime import datetime, timezone
 from uuid import UUID
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from src.billing.domain.models import Subscription, UsageRecord
-from src.billing.domain.repositories import SubscriptionRepository, UsageRepository
+from src.billing.domain.models import Invoice, InvoiceLineItem, Subscription, UsageRecord
+from src.billing.domain.repositories import (
+    InvoiceRepository,
+    SubscriptionRepository,
+    UsageRepository,
+)
 
 
 def _ensure_tz(dt):
@@ -88,3 +92,73 @@ class MongoUsageRepository(UsageRepository):
     async def find_by_org(self, org_id: UUID) -> list[UsageRecord]:
         cursor = self._col.find({"org_id": str(org_id)}).sort("created_at", -1)
         return [_usage_from_doc(doc) async for doc in cursor]
+
+    async def find_by_org_and_period(
+        self, org_id: UUID, period_start: datetime, period_end: datetime
+    ) -> list[UsageRecord]:
+        cursor = self._col.find(
+            {"org_id": str(org_id), "created_at": {"$gte": period_start, "$lt": period_end}}
+        ).sort("created_at", 1)
+        return [_usage_from_doc(doc) async for doc in cursor]
+
+
+def _invoice_line_to_doc(item: InvoiceLineItem) -> dict:
+    return {
+        "conversation_id": str(item.conversation_id),
+        "duration_seconds": item.duration_seconds,
+        "tokens_consumed": item.tokens_consumed,
+    }
+
+
+def _invoice_line_from_doc(doc: dict) -> InvoiceLineItem:
+    return InvoiceLineItem(
+        conversation_id=UUID(doc["conversation_id"]),
+        duration_seconds=doc["duration_seconds"],
+        tokens_consumed=doc["tokens_consumed"],
+    )
+
+
+def _invoice_to_doc(inv: Invoice) -> dict:
+    return {
+        "_id": str(inv.id),
+        "org_id": str(inv.org_id),
+        "period_start": inv.period_start,
+        "period_end": inv.period_end,
+        "line_items": [_invoice_line_to_doc(i) for i in inv.line_items],
+        "total_tokens": inv.total_tokens,
+        "generated_at": inv.generated_at,
+    }
+
+
+def _invoice_from_doc(doc: dict) -> Invoice:
+    return Invoice(
+        id=UUID(doc["_id"]),
+        org_id=UUID(doc["org_id"]),
+        period_start=_ensure_tz(doc["period_start"]),
+        period_end=_ensure_tz(doc["period_end"]),
+        line_items=[_invoice_line_from_doc(i) for i in doc.get("line_items", [])],
+        total_tokens=doc["total_tokens"],
+        generated_at=_ensure_tz(doc["generated_at"]),
+    )
+
+
+class MongoInvoiceRepository(InvoiceRepository):
+    collection_name = "billing_invoices"
+
+    def __init__(self, db: AsyncIOMotorDatabase) -> None:
+        self._col = db[self.collection_name]
+
+    async def save(self, invoice: Invoice) -> None:
+        await self._col.insert_one(_invoice_to_doc(invoice))
+
+    async def find_by_org(self, org_id: UUID) -> list[Invoice]:
+        cursor = self._col.find({"org_id": str(org_id)}).sort("period_start", -1)
+        return [_invoice_from_doc(doc) async for doc in cursor]
+
+    async def find_by_org_and_period(
+        self, org_id: UUID, period_start: datetime, period_end: datetime
+    ) -> Invoice | None:
+        doc = await self._col.find_one(
+            {"org_id": str(org_id), "period_start": period_start, "period_end": period_end}
+        )
+        return _invoice_from_doc(doc) if doc else None

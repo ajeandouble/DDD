@@ -19,6 +19,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { ConversationPage } from "./pages/ConversationPage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { BillingPage } from "./pages/BillingPage";
+import { SchedulerPage } from "./pages/SchedulerPage";
 
 const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
       { path: "/campaigns/:campaignId", element: <CampaignPage /> },
       { path: "/orgs/:orgId/webhooks", element: <WebhooksPage /> },
       { path: "/orgs/:orgId/billing", element: <BillingPage /> },
+      { path: "/orgs/:orgId/scheduler", element: <SchedulerPage /> },
       { path: "/orgs", element: <OrganizationsPage /> },
       { path: "/orgs/:orgId", element: <OrganizationPage /> },
       { path: "/orgs/:orgId/projects/:projectId", element: <ProjectPage /> },

@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from src.billing.application.commands import upgrade_tier
-from src.billing.application.queries import get_subscription, list_usage
+from src.billing.application.queries import get_subscription, list_invoices, list_usage
 from src.billing.domain.models import PLAN_LIMITS
 from src.billing.infrastructure.repositories import (
+    MongoInvoiceRepository,
     MongoSubscriptionRepository,
     MongoUsageRepository,
 )
@@ -23,6 +24,10 @@ def _sub_repo():
 
 def _usage_repo():
     return MongoUsageRepository(get_db())
+
+
+def _invoice_repo():
+    return MongoInvoiceRepository(get_db())
 
 
 class SubscriptionResponse(BaseModel):
@@ -46,6 +51,22 @@ class UsageRecordResponse(BaseModel):
     duration_seconds: float
     tokens_consumed: int
     created_at: str
+
+
+class InvoiceLineItemResponse(BaseModel):
+    conversation_id: str
+    duration_seconds: float
+    tokens_consumed: int
+
+
+class InvoiceResponse(BaseModel):
+    id: str
+    org_id: str
+    period_start: str
+    period_end: str
+    line_items: list[InvoiceLineItemResponse]
+    total_tokens: int
+    generated_at: str
 
 
 def _sub_resp(sub) -> SubscriptionResponse:
@@ -119,4 +140,34 @@ async def get_org_usage(
             created_at=r.created_at.isoformat(),
         )
         for r in records
+    ]
+
+
+@router.get("/organizations/{org_id}/invoices", response_model=list[InvoiceResponse])
+async def get_org_invoices(
+    org_id: UUID,
+    invoice_repo: MongoInvoiceRepository = Depends(_invoice_repo),
+    user: User = Depends(get_current_user),
+    authz=Depends(get_authz),
+):
+    await _require_org_member(org_id, user, authz)
+    invoices = await list_invoices(org_id, invoice_repo)
+    return [
+        InvoiceResponse(
+            id=str(inv.id),
+            org_id=str(inv.org_id),
+            period_start=inv.period_start.isoformat(),
+            period_end=inv.period_end.isoformat(),
+            line_items=[
+                InvoiceLineItemResponse(
+                    conversation_id=str(item.conversation_id),
+                    duration_seconds=item.duration_seconds,
+                    tokens_consumed=item.tokens_consumed,
+                )
+                for item in inv.line_items
+            ],
+            total_tokens=inv.total_tokens,
+            generated_at=inv.generated_at.isoformat(),
+        )
+        for inv in invoices
     ]

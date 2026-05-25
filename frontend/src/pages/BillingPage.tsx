@@ -19,7 +19,7 @@ import {
   Divider,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { getSubscription, upgradeSubscription, getUsage } from "../lib/api";
+import { getSubscription, upgradeSubscription, getUsage, getInvoices } from "../lib/api";
 import { useMyRoles } from "../hooks/useMyRoles";
 import { useTranslation } from "react-i18next";
 
@@ -69,6 +69,12 @@ export function BillingPage() {
   const { data: usage, isLoading: usageLoading } = useQuery({
     queryKey: ["usage", orgId],
     queryFn: () => getUsage(orgId!),
+    retry: false,
+  });
+
+  const { data: invoices, isLoading: invoicesLoading } = useQuery({
+    queryKey: ["invoices", orgId],
+    queryFn: () => getInvoices(orgId!),
     retry: false,
   });
 
@@ -271,6 +277,57 @@ export function BillingPage() {
                   <Table.Td>
                     <Text size="xs" fw={500}>
                       {r.tokens_consumed}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        )}
+      </div>
+
+      <div>
+        <Text fw={600} mb="sm">
+          {t("billing.invoices")}
+        </Text>
+        {invoicesLoading && <Loader size="sm" />}
+        {!invoicesLoading && invoices?.length === 0 && (
+          <Text size="sm" c="dimmed">
+            {t("billing.noInvoices")}
+          </Text>
+        )}
+        {invoices && invoices.length > 0 && (
+          <Table withTableBorder withColumnBorders highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t("billing.period")}</Table.Th>
+                <Table.Th>{t("billing.lineItems")}</Table.Th>
+                <Table.Th>{t("billing.tokens")}</Table.Th>
+                <Table.Th>{t("billing.generatedAt")}</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {invoices.map((inv) => (
+                <Table.Tr key={inv.id}>
+                  <Table.Td>
+                    <Text size="xs">
+                      {new Date(inv.period_start).toLocaleDateString(undefined, {
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs">{inv.line_items.length}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs" fw={500}>
+                      {inv.total_tokens.toLocaleString()}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs" c="dimmed">
+                      {new Date(inv.generated_at).toLocaleString()}
                     </Text>
                   </Table.Td>
                 </Table.Tr>

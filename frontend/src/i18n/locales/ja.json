@@ -296,7 +296,12 @@
     "webhooksIncluded": "✓ Webhook",
     "webhooksExcluded": "✗ Webhookなし",
     "current": "現在",
-    "simPaymentInfo": "模擬支払い — 実際の請求は発生しません。"
+    "simPaymentInfo": "模擬支払い — 実際の請求は発生しません。",
+    "invoices": "請求書",
+    "noInvoices": "請求書はまだありません。",
+    "period": "期間",
+    "lineItems": "明細",
+    "generatedAt": "生成日時"
   },
   "conversation": {
     "editTitle": "会話を編集",
@@ -319,5 +324,21 @@
     "project": "プロジェクト",
     "subproject": "サブプロジェクト",
     "campaign": "キャンペーン"
+  },
+  "scheduler": {
+    "title": "スケジューラー",
+    "noRuns": "実行履歴なし。",
+    "noLogs": "ログなし。",
+    "lastRun": "最終実行",
+    "nextRun": "次回実行",
+    "trigger": "今すぐ実行",
+    "editCron": "スケジュール編集",
+    "showRuns": "実行履歴を表示",
+    "hideRuns": "実行履歴を非表示",
+    "invalidCron": "無効なcron式",
+    "refAny": "任意の値",
+    "refList": "値のリスト",
+    "refRange": "値の範囲",
+    "refStep": "ステップ値"
   }
 }

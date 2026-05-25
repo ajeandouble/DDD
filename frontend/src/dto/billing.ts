@@ -22,3 +22,21 @@ export const UsageRecordResponseSchema = z.object({
 });
 
 export type UsageRecordResponse = z.infer<typeof UsageRecordResponseSchema>;
+
+export const InvoiceLineItemSchema = z.object({
+  conversation_id: z.string().uuid(),
+  duration_seconds: z.number(),
+  tokens_consumed: z.number(),
+});
+
+export const InvoiceResponseSchema = z.object({
+  id: z.string().uuid(),
+  org_id: z.string().uuid(),
+  period_start: z.string(),
+  period_end: z.string(),
+  line_items: z.array(InvoiceLineItemSchema),
+  total_tokens: z.number(),
+  generated_at: z.string(),
+});
+
+export type InvoiceResponse = z.infer<typeof InvoiceResponseSchema>;

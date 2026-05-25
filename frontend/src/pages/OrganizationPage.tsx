@@ -25,7 +25,7 @@ import {
   createCampaignUnderOrg,
 } from "../lib/api";
 import { MembersDrawer } from "../components/MembersDrawer";
-import { useCanManageMembers, useCanAdmin, useMyRoles } from "../hooks/useMyRoles";
+import { useCanManageMembers, useCanAdmin, useIsSuperAdmin, useMyRoles } from "../hooks/useMyRoles";
 import { useTranslation } from "react-i18next";
 
 export function OrganizationPage() {
@@ -40,6 +40,7 @@ export function OrganizationPage() {
   const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
   const canManageMembers = useCanManageMembers(orgId, "org", orgId);
   const canAdminOrg = useCanAdmin(orgId, "org", orgId);
+  const isSuperAdmin = useIsSuperAdmin();
   const { data: myRoles } = useMyRoles(orgId);
   const isOrgMember = myRoles != null;
   const [projectName, setProjectName] = useState("");
@@ -172,6 +173,11 @@ export function OrganizationPage() {
             {canAdminOrg && (
               <Button size="xs" variant="light" component={Link} to={`/orgs/${orgId}/webhooks`}>
                 {t("webhooks.title")}
+              </Button>
+            )}
+            {isSuperAdmin && (
+              <Button size="xs" variant="light" component={Link} to={`/orgs/${orgId}/scheduler`}>
+                {t("scheduler.title")}
               </Button>
             )}
             {canManageMembers && (

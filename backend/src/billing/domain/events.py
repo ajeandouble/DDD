@@ -23,6 +23,15 @@ class UsageRecorded:
 
 
 @dataclass(frozen=True)
+class InvoiceGenerated:
+    org_id: UUID
+    invoice_id: UUID
+    period_start: str
+    period_end: str
+    total_tokens: int
+
+
+@dataclass(frozen=True)
 class QuotaExhausted:
     org_id: UUID
     tier: str

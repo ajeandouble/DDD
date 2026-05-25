@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from src.billing.domain.models import Subscription, UsageRecord
+from datetime import datetime
+
+from src.billing.domain.models import Invoice, Subscription, UsageRecord
 
 
 class SubscriptionRepository(ABC):
@@ -21,3 +23,21 @@ class UsageRepository(ABC):
 
     @abstractmethod
     async def find_by_org(self, org_id: UUID) -> list[UsageRecord]: ...
+
+    @abstractmethod
+    async def find_by_org_and_period(
+        self, org_id: UUID, period_start: datetime, period_end: datetime
+    ) -> list[UsageRecord]: ...
+
+
+class InvoiceRepository(ABC):
+    @abstractmethod
+    async def save(self, invoice: Invoice) -> None: ...
+
+    @abstractmethod
+    async def find_by_org(self, org_id: UUID) -> list[Invoice]: ...
+
+    @abstractmethod
+    async def find_by_org_and_period(
+        self, org_id: UUID, period_start: datetime, period_end: datetime
+    ) -> Invoice | None: ...

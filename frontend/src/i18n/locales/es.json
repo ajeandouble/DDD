@@ -290,7 +290,12 @@
     "webhooksIncluded": "✓ Webhooks",
     "webhooksExcluded": "✗ Sin webhooks",
     "current": "Actual",
-    "simPaymentInfo": "Pago simulado — no se realizará ningún cargo real."
+    "simPaymentInfo": "Pago simulado — no se realizará ningún cargo real.",
+    "invoices": "Facturas",
+    "noInvoices": "Aún no se han generado facturas.",
+    "period": "Período",
+    "lineItems": "Líneas",
+    "generatedAt": "Generado el"
   },
   "conversation": {
     "editTitle": "Editar conversación",
@@ -313,5 +318,21 @@
     "project": "Proyecto",
     "subproject": "Subproyecto",
     "campaign": "Campaña"
+  },
+  "scheduler": {
+    "title": "Planificador",
+    "noRuns": "Sin ejecuciones.",
+    "noLogs": "Sin logs.",
+    "lastRun": "Última ejecución",
+    "nextRun": "Próxima ejecución",
+    "trigger": "Ejecutar ahora",
+    "editCron": "Editar horario",
+    "showRuns": "Ver ejecuciones",
+    "hideRuns": "Ocultar ejecuciones",
+    "invalidCron": "Expresión cron inválida",
+    "refAny": "cualquier valor",
+    "refList": "lista de valores",
+    "refRange": "rango de valores",
+    "refStep": "paso"
   }
 }

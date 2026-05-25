@@ -36,9 +36,18 @@ from src.webhooks.infrastructure.repositories import (
 from src.billing.api import router as billing_router
 from src.billing.application.event_handlers import register_handlers as register_billing_handlers
 from src.billing.infrastructure.repositories import (
+    MongoInvoiceRepository,
     MongoSubscriptionRepository,
     MongoUsageRepository,
 )
+from src.scheduler.application import init_scheduler, register_job, run_scheduler, sync_jobs_to_db
+from src.scheduler.api import router as scheduler_router
+from src.scheduler.infrastructure.repositories import (
+    MongoCronJobRepository,
+    MongoJobRunRepository,
+    OrgIdsQuery,
+)
+from src.scheduler.jobs.invoice import make_monthly_invoice_job
 import src.analyzer.application as analyzer_worker
 
 
@@ -61,11 +70,27 @@ async def lifespan(app: FastAPI):
         sub_repo_factory=lambda: MongoSubscriptionRepository(database.get_db()),
         usage_repo_factory=lambda: MongoUsageRepository(database.get_db()),
     )
-    task = asyncio.create_task(
+    register_job(
+        name="monthly_invoices",
+        cron_expr="0 0 1 * *",
+        job=make_monthly_invoice_job(
+            usage_repo_factory=lambda: MongoUsageRepository(database.get_db()),
+            invoice_repo_factory=lambda: MongoInvoiceRepository(database.get_db()),
+            org_ids_factory=lambda: OrgIdsQuery(database.get_db()).all_org_ids(),
+        ),
+    )
+    init_scheduler(
+        job_repo_factory=lambda: MongoCronJobRepository(database.get_db()),
+        run_repo_factory=lambda: MongoJobRunRepository(database.get_db()),
+    )
+    await sync_jobs_to_db()
+    analyzer_task = asyncio.create_task(
         analyzer_worker.worker(repo_factory=lambda: MongoAnalysisJobRepository(database.get_db()))
     )
+    scheduler_task = asyncio.create_task(run_scheduler())
     yield
-    task.cancel()
+    analyzer_task.cancel()
+    scheduler_task.cancel()
     await database.disconnect()
 
 
@@ -90,6 +115,7 @@ app.include_router(analyzer_router)
 app.include_router(storage_router)
 app.include_router(webhooks_router)
 app.include_router(billing_router)
+app.include_router(scheduler_router)
 app.include_router(events_router)
 
 

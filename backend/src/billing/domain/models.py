@@ -72,6 +72,49 @@ class Subscription:
 
 
 @dataclass
+class InvoiceLineItem:
+    conversation_id: UUID
+    duration_seconds: float
+    tokens_consumed: int
+
+
+@dataclass
+class Invoice:
+    id: UUID
+    org_id: UUID
+    period_start: datetime
+    period_end: datetime
+    line_items: list[InvoiceLineItem]
+    total_tokens: int
+    generated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @classmethod
+    def generate(
+        cls,
+        org_id: UUID,
+        period_start: datetime,
+        period_end: datetime,
+        usage_records: list["UsageRecord"],
+    ) -> "Invoice":
+        items = [
+            InvoiceLineItem(
+                conversation_id=r.conversation_id,
+                duration_seconds=r.duration_seconds,
+                tokens_consumed=r.tokens_consumed,
+            )
+            for r in usage_records
+        ]
+        return cls(
+            id=uuid4(),
+            org_id=org_id,
+            period_start=period_start,
+            period_end=period_end,
+            line_items=items,
+            total_tokens=sum(r.tokens_consumed for r in usage_records),
+        )
+
+
+@dataclass
 class UsageRecord:
     id: UUID
     org_id: UUID
