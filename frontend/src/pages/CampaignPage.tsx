@@ -17,6 +17,7 @@ import { EditableTitle } from "../components/EditableTitle";
 import { useCanManageMembers, useMyRoles } from "../hooks/useMyRoles";
 import { getEffectiveRole, canManageMembers } from "../dto/permissions";
 import { useTranslation } from "react-i18next";
+import type { Campaign } from "../dto/scopes";
 
 export function CampaignPage() {
   const { campaignId } = useParams<{ campaignId: string }>();
@@ -63,10 +64,46 @@ export function CampaignPage() {
   const scopeRole = myRoles ? getEffectiveRole("campaign", campaignId!, myRoles) : null;
   const canSettings = canManageMembers(scopeRole);
 
+  function invalidateCampaignLists() {
+    queryClient.invalidateQueries({ queryKey: ["campaigns", campaign?.parent_id] });
+    queryClient.invalidateQueries({ queryKey: ["campaigns-by-project", campaign?.parent_id] });
+    queryClient.invalidateQueries({ queryKey: ["campaigns-by-org", orgId] });
+  }
+
+  const renameMutation = useMutation({
+    mutationFn: (name: string) => renameCampaign(campaignId!, name),
+    onMutate: async (name) => {
+      await queryClient.cancelQueries({ queryKey: ["campaign", campaignId] });
+      const previous = queryClient.getQueryData(["campaign", campaignId]);
+      queryClient.setQueryData(["campaign", campaignId], (old: Campaign) =>
+        old ? { ...old, name } : old
+      );
+      return { previous };
+    },
+    onError: (_err, _name, ctx) => {
+      queryClient.setQueryData(["campaign", campaignId], ctx?.previous);
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["campaign", campaignId], updated);
+      invalidateCampaignLists();
+    },
+  });
+
   const settingsMutation = useMutation({
     mutationFn: (color: string | null) => updateCampaignSettings(campaignId!, { color }),
+    onMutate: async (color) => {
+      await queryClient.cancelQueries({ queryKey: ["campaign", campaignId] });
+      const previous = queryClient.getQueryData(["campaign", campaignId]);
+      queryClient.setQueryData(["campaign", campaignId], (old: Campaign) =>
+        old ? { ...old, color } : old
+      );
+      return { previous };
+    },
+    onError: (_err, _color, ctx) => {
+      queryClient.setQueryData(["campaign", campaignId], ctx?.previous);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["campaign", campaignId] });
+      invalidateCampaignLists();
       closeSettings();
     },
   });
@@ -104,11 +141,7 @@ export function CampaignPage() {
           value={campaign?.name ?? ""}
           order={2}
           canEdit={canSettings}
-          onSave={(name) =>
-            renameCampaign(campaignId!, name).then((c) => {
-              queryClient.setQueryData(["campaign", campaignId], c);
-            })
-          }
+          onSave={(name) => renameMutation.mutateAsync(name).then(() => {})}
         />
         <Group gap={6}>
           {canSettings && (

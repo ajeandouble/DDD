@@ -28,7 +28,7 @@ import { MembersDrawer } from "../components/MembersDrawer";
 import { useCanManageMembers, useCanAdmin, useMyRoles } from "../hooks/useMyRoles";
 import { useTranslation } from "react-i18next";
 
-export function ProjectsPage() {
+export function OrganizationPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -120,7 +120,6 @@ export function ProjectsPage() {
           </Group>
         </Stack>
       </Modal>
-
       <Modal
         opened={campaignModalOpened}
         onClose={closeCampaignModal}
@@ -154,7 +153,6 @@ export function ProjectsPage() {
           </Group>
         </Stack>
       </Modal>
-
       <Stack gap="lg">
         <Breadcrumbs>
           <Anchor component={Link} to="/orgs" size="sm">

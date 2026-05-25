@@ -95,7 +95,7 @@ export const getConversation = (id: string): Promise<ConversationResponse> =>
   api.get(`conversations/${id}`, { headers: authHeaders() }).json();
 
 export const deleteConversation = (id: string): Promise<void> =>
-  api.delete(`conversations/${id}`, { headers: authHeaders() }).json();
+  api.delete(`conversations/${id}`, { headers: authHeaders() }).then(() => undefined);
 
 export const getMe = (): Promise<UserResponse> =>
   api.get("auth/me", { headers: authHeaders() }).json();

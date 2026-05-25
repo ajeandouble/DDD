@@ -30,8 +30,9 @@ import { ScopeSettingsModal } from "../components/ScopeSettingsModal";
 import { EditableTitle } from "../components/EditableTitle";
 import { useCanManageMembers } from "../hooks/useMyRoles";
 import { useTranslation } from "react-i18next";
+import type { Subproject } from "../dto/scopes";
 
-export function CampaignsPage() {
+export function SubprojectPage() {
   const { orgId, projectId, subprojectId } = useParams<{
     orgId: string;
     projectId: string;
@@ -79,10 +80,40 @@ export function CampaignsPage() {
     },
   });
 
+  const renameMutation = useMutation({
+    mutationFn: (name: string) => renameSubproject(subprojectId!, name),
+    onMutate: async (name) => {
+      await queryClient.cancelQueries({ queryKey: ["subproject", subprojectId] });
+      const previous = queryClient.getQueryData(["subproject", subprojectId]);
+      queryClient.setQueryData(["subproject", subprojectId], (old: Subproject) =>
+        old ? { ...old, name } : old
+      );
+      return { previous };
+    },
+    onError: (_err, _name, ctx) => {
+      queryClient.setQueryData(["subproject", subprojectId], ctx?.previous);
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["subproject", subprojectId], updated);
+      queryClient.invalidateQueries({ queryKey: ["subprojects", projectId] });
+    },
+  });
+
   const settingsMutation = useMutation({
     mutationFn: (color: string | null) => updateSubprojectSettings(subprojectId!, { color }),
+    onMutate: async (color) => {
+      await queryClient.cancelQueries({ queryKey: ["subproject", subprojectId] });
+      const previous = queryClient.getQueryData(["subproject", subprojectId]);
+      queryClient.setQueryData(["subproject", subprojectId], (old: Subproject) =>
+        old ? { ...old, color } : old
+      );
+      return { previous };
+    },
+    onError: (_err, _color, ctx) => {
+      queryClient.setQueryData(["subproject", subprojectId], ctx?.previous);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["subproject", subprojectId] });
+      queryClient.invalidateQueries({ queryKey: ["subprojects", projectId] });
       closeSettings();
     },
   });
@@ -116,7 +147,6 @@ export function CampaignsPage() {
           </Group>
         </Stack>
       </Modal>
-
       <ScopeSettingsModal
         opened={settingsOpened}
         onClose={closeSettings}
@@ -125,7 +155,6 @@ export function CampaignsPage() {
         isPending={settingsMutation.isPending}
         error={settingsMutation.error}
       />
-
       <Stack gap="lg">
         <Breadcrumbs>
           <Anchor component={Link} to="/orgs" size="sm">
@@ -157,11 +186,7 @@ export function CampaignsPage() {
             value={subproject?.name ?? ""}
             order={2}
             canEdit={canManageMembersOnScope}
-            onSave={(name) =>
-              renameSubproject(subprojectId!, name).then((sp) => {
-                queryClient.setQueryData(["subproject", subprojectId], sp);
-              })
-            }
+            onSave={(name) => renameMutation.mutateAsync(name).then(() => {})}
           />
           <Group gap={6}>
             {canManageMembersOnScope && (

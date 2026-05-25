@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBackoffInterval } from "../hooks/useBackoffInterval";
+import { useSSEConnected } from "../context/SSEContext";
 import {
   Group,
   Button,
@@ -386,7 +387,9 @@ export function ConversationsSection({ organizationId, scopeId, scopeType, query
 
   // A conversation is "pending transcript" if type="conversation" but content is empty (awaiting transcription).
   const [hasPending, setHasPending] = useState(false);
-  const refetchInterval = useBackoffInterval(hasPending);
+  const sseConnected = useSSEConnected();
+  // SSE drives invalidation when connected; fall back to backoff polling otherwise.
+  const refetchInterval = useBackoffInterval(!sseConnected && hasPending);
 
   const scopeParams =
     scopeId && scopeType

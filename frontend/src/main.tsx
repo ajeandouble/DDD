@@ -11,9 +11,9 @@ import { queryClient } from "./lib/query-client";
 import { LoginPage } from "./pages/LoginPage";
 import { AppLayout } from "./components/AppLayout";
 import { OrganizationsPage } from "./pages/OrganizationsPage";
-import { ProjectsPage } from "./pages/ProjectsPage";
-import { SubprojectsPage } from "./pages/SubprojectsPage";
-import { CampaignsPage } from "./pages/CampaignsPage";
+import { OrganizationPage } from "./pages/OrganizationPage";
+import { ProjectPage } from "./pages/ProjectPage";
+import { SubprojectPage } from "./pages/SubprojectPage";
 import { CampaignPage } from "./pages/CampaignPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ConversationPage } from "./pages/ConversationPage";
@@ -32,11 +32,11 @@ const router = createBrowserRouter([
       { path: "/orgs/:orgId/webhooks", element: <WebhooksPage /> },
       { path: "/orgs/:orgId/billing", element: <BillingPage /> },
       { path: "/orgs", element: <OrganizationsPage /> },
-      { path: "/orgs/:orgId", element: <ProjectsPage /> },
-      { path: "/orgs/:orgId/projects/:projectId", element: <SubprojectsPage /> },
+      { path: "/orgs/:orgId", element: <OrganizationPage /> },
+      { path: "/orgs/:orgId/projects/:projectId", element: <ProjectPage /> },
       {
         path: "/orgs/:orgId/projects/:projectId/subprojects/:subprojectId",
-        element: <CampaignsPage />,
+        element: <SubprojectPage />,
       },
     ],
   },
