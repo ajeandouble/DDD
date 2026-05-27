@@ -16,7 +16,7 @@ make install
 cd backend && uv run python scripts/seed_dev.py
 
 # 3. Start backend + frontend concurrently
-make dev # might not work because of my lazyness in which case run them independently with `make dev-backend` and `make dev-frontend`
+make dev # might not work because of my laziness in which case run them independently with `make dev-backend` and `make dev-frontend`
 ```
 
 The backend starts at `http://localhost:8000` and the frontend at `http://localhost:5173`.
