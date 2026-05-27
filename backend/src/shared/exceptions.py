@@ -1,0 +1,2 @@
+class WebhookAccessDenied(Exception):
+    pass

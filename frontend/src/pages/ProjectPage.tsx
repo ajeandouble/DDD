@@ -1,0 +1,323 @@
+import { useState } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Group,
+  Button,
+  Modal,
+  TextInput,
+  SimpleGrid,
+  Text,
+  Stack,
+  Loader,
+  Alert,
+  Breadcrumbs,
+  Anchor,
+} from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import {
+  getOrganization,
+  getProject,
+  getSubprojects,
+  createSubproject,
+  getCampaignsByProject,
+  createCampaignUnderProject,
+  updateProjectSettings,
+  renameProject,
+} from "../lib/api";
+import { MembersDrawer } from "../components/MembersDrawer";
+import { ScopeCard } from "../components/ScopeCard";
+import { ScopeSettingsModal } from "../components/ScopeSettingsModal";
+import { EditableTitle } from "../components/EditableTitle";
+import { useCanManageMembers } from "../hooks/useMyRoles";
+import { useTranslation } from "react-i18next";
+import type { Project } from "../dto/scopes";
+
+export function ProjectPage() {
+  const { orgId, projectId } = useParams<{ orgId: string; projectId: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [subprojectModalOpened, { open: openSubprojectModal, close: closeSubprojectModal }] =
+    useDisclosure(false);
+  const [campaignModalOpened, { open: openCampaignModal, close: closeCampaignModal }] =
+    useDisclosure(false);
+  const [membersOpened, { open: openMembers, close: closeMembers }] = useDisclosure(false);
+  const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
+  const canManageMembersOnScope = useCanManageMembers(orgId, "project", projectId);
+  const { t } = useTranslation();
+  const [subprojectName, setSubprojectName] = useState("");
+  const [campaignName, setCampaignName] = useState("");
+
+  const { data: org } = useQuery({
+    queryKey: ["organization", orgId],
+    queryFn: () => getOrganization(orgId!),
+    retry: false,
+  });
+
+  const { data: project } = useQuery({
+    queryKey: ["project", projectId],
+    queryFn: () => getProject(projectId!),
+    retry: false,
+  });
+
+  const {
+    data: subprojects,
+    isLoading: subprojectsLoading,
+    error: subprojectsError,
+  } = useQuery({
+    queryKey: ["subprojects", projectId],
+    queryFn: () => getSubprojects(projectId!),
+    retry: false,
+  });
+
+  const { data: campaigns, isLoading: campaignsLoading } = useQuery({
+    queryKey: ["campaigns-by-project", projectId],
+    queryFn: () => getCampaignsByProject(projectId!),
+    retry: false,
+  });
+
+  const createSubprojectMutation = useMutation({
+    mutationFn: () => createSubproject(projectId!, subprojectName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subprojects", projectId] });
+      closeSubprojectModal();
+      setSubprojectName("");
+    },
+  });
+
+  const createCampaignMutation = useMutation({
+    mutationFn: () => createCampaignUnderProject(projectId!, campaignName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns-by-project", projectId] });
+      closeCampaignModal();
+      setCampaignName("");
+    },
+  });
+
+  const renameMutation = useMutation({
+    mutationFn: (name: string) => renameProject(projectId!, name),
+    onMutate: async (name) => {
+      await queryClient.cancelQueries({ queryKey: ["project", projectId] });
+      const previous = queryClient.getQueryData(["project", projectId]);
+      queryClient.setQueryData(["project", projectId], (old: Project) =>
+        old ? { ...old, name } : old
+      );
+      return { previous };
+    },
+    onError: (_err, _name, ctx) => {
+      queryClient.setQueryData(["project", projectId], ctx?.previous);
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["project", projectId], updated);
+      queryClient.invalidateQueries({ queryKey: ["projects", orgId] });
+    },
+  });
+
+  const settingsMutation = useMutation({
+    mutationFn: (color: string | null) => updateProjectSettings(projectId!, { color }),
+    onMutate: async (color) => {
+      await queryClient.cancelQueries({ queryKey: ["project", projectId] });
+      const previous = queryClient.getQueryData(["project", projectId]);
+      queryClient.setQueryData(["project", projectId], (old: Project) =>
+        old ? { ...old, color } : old
+      );
+      return { previous };
+    },
+    onError: (_err, _color, ctx) => {
+      queryClient.setQueryData(["project", projectId], ctx?.previous);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects", orgId] });
+      closeSettings();
+    },
+  });
+
+  const color = project?.color;
+
+  return (
+    <>
+      <Modal
+        opened={subprojectModalOpened}
+        onClose={closeSubprojectModal}
+        title={t("subprojects.modalTitle")}
+        centered
+      >
+        <Stack>
+          <TextInput
+            label={t("common.name")}
+            placeholder={t("subprojects.namePlaceholder")}
+            value={subprojectName}
+            onChange={(e) => setSubprojectName(e.currentTarget.value)}
+            onKeyDown={(e) => e.key === "Enter" && createSubprojectMutation.mutate()}
+            data-autofocus
+          />
+          {createSubprojectMutation.isError && (
+            <Text size="sm" c="red">
+              {String(createSubprojectMutation.error)}
+            </Text>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeSubprojectModal}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={() => createSubprojectMutation.mutate()}
+              loading={createSubprojectMutation.isPending}
+            >
+              {t("common.create")}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={campaignModalOpened}
+        onClose={closeCampaignModal}
+        title={t("campaigns.modalTitle")}
+        centered
+      >
+        <Stack>
+          <TextInput
+            label={t("common.name")}
+            placeholder={t("campaigns.namePlaceholder")}
+            value={campaignName}
+            onChange={(e) => setCampaignName(e.currentTarget.value)}
+            onKeyDown={(e) => e.key === "Enter" && createCampaignMutation.mutate()}
+            data-autofocus
+          />
+          {createCampaignMutation.isError && (
+            <Text size="sm" c="red">
+              {String(createCampaignMutation.error)}
+            </Text>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeCampaignModal}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={() => createCampaignMutation.mutate()}
+              loading={createCampaignMutation.isPending}
+            >
+              {t("common.create")}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <ScopeSettingsModal
+        opened={settingsOpened}
+        onClose={closeSettings}
+        currentColor={project?.color}
+        onSave={(color) => settingsMutation.mutate(color)}
+        isPending={settingsMutation.isPending}
+        error={settingsMutation.error}
+      />
+
+      <Stack gap="lg">
+        <Breadcrumbs>
+          <Anchor component={Link} to="/orgs" size="sm">
+            {t("orgs.title")}
+          </Anchor>
+          <Anchor component={Link} to={`/orgs/${orgId}`} size="sm">
+            {org?.name ?? orgId}
+          </Anchor>
+          <Text size="sm">{project?.name ?? projectId}</Text>
+        </Breadcrumbs>
+
+        <Group
+          justify="space-between"
+          style={
+            color
+              ? {
+                  borderLeft: `4px solid ${color}`,
+                  paddingLeft: 12,
+                  background: `${color}12`,
+                  borderRadius: 4,
+                }
+              : undefined
+          }
+        >
+          <EditableTitle
+            value={project?.name ?? ""}
+            order={2}
+            canEdit={canManageMembersOnScope}
+            onSave={(name) => renameMutation.mutateAsync(name).then(() => {})}
+          />
+          <Group gap={6}>
+            {canManageMembersOnScope && (
+              <Button size="xs" variant="light" onClick={openSettings}>
+                {t("scopes.settings")}
+              </Button>
+            )}
+            {canManageMembersOnScope && (
+              <Button size="xs" variant="light" onClick={openMembers}>
+                {t("scopes.members")}
+              </Button>
+            )}
+          </Group>
+        </Group>
+
+        <MembersDrawer
+          showGroups
+          orgId={orgId!}
+          scopeType="project"
+          scopeId={projectId!}
+          opened={membersOpened}
+          onClose={closeMembers}
+        />
+
+        {/* Direct campaigns under this project */}
+        <Group justify="space-between" mt="sm">
+          <Text fw={600}>{t("projects.campaigns")}</Text>
+          <Button size="xs" onClick={openCampaignModal}>
+            {t("campaigns.new")}
+          </Button>
+        </Group>
+
+        {campaignsLoading && <Loader size="sm" />}
+        {campaigns?.length === 0 && (
+          <Text c="dimmed" size="sm">
+            {t("campaigns.noCampaigns")}
+          </Text>
+        )}
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+          {campaigns?.map((c) => (
+            <ScopeCard
+              key={c.id}
+              name={c.name}
+              color={c.color}
+              onClick={() => navigate(`/campaigns/${c.id}`)}
+            />
+          ))}
+        </SimpleGrid>
+
+        {/* Subprojects */}
+        <Group justify="space-between" mt="sm">
+          <Text fw={600}>{t("subprojects.title")}</Text>
+          <Button size="xs" onClick={openSubprojectModal}>
+            {t("subprojects.new")}
+          </Button>
+        </Group>
+
+        {subprojectsLoading && <Loader />}
+        {subprojectsError && <Alert color="red">{String(subprojectsError)}</Alert>}
+        {subprojects?.length === 0 && (
+          <Text c="dimmed" size="sm">
+            {t("subprojects.noSubprojects")}
+          </Text>
+        )}
+
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+          {subprojects?.map((sp) => (
+            <ScopeCard
+              key={sp.id}
+              name={sp.name}
+              color={sp.color}
+              onClick={() => navigate(`/orgs/${orgId}/projects/${projectId}/subprojects/${sp.id}`)}
+            />
+          ))}
+        </SimpleGrid>
+      </Stack>
+    </>
+  );
+}

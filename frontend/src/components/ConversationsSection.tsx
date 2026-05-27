@@ -1,0 +1,965 @@
+import { useRef, useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useBackoffInterval } from "../hooks/useBackoffInterval";
+import { useSSEConnected } from "../context/SSEContext";
+import {
+  Group,
+  Button,
+  Modal,
+  TextInput,
+  Textarea,
+  Stack,
+  Text,
+  Divider,
+  Paper,
+  Loader,
+  Alert,
+  Badge,
+  Progress,
+  SegmentedControl,
+  ActionIcon,
+  Select,
+  MultiSelect,
+  Pagination,
+  Collapse,
+  ScrollArea,
+} from "@mantine/core";
+import { IconPlus, IconTrash, IconSearch } from "@tabler/icons-react";
+import { useDisclosure } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
+import {
+  searchConversations,
+  createConversation,
+  updateConversation,
+  deleteConversation,
+  getMe,
+  uploadAudio,
+  getImportJobs,
+  listTags,
+} from "../lib/api";
+import type { ConvFilter, FilterField, FilterOp } from "../lib/api";
+import type { ConversationResponse } from "../dto/conversations";
+import { useMyRoles } from "../hooks/useMyRoles";
+import { canWrite } from "../dto/permissions";
+import { useTranslation } from "react-i18next";
+
+const PAGE_SIZE_OPTIONS = ["25", "50", "100"];
+const PREFS_KEY = "conv_prefs";
+
+interface CampaignPrefs {
+  pageSize: number;
+  sortBy: string;
+  sortDir: number;
+}
+
+function loadPrefs(scopeId: string): CampaignPrefs {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    const all = raw ? JSON.parse(raw) : {};
+    return all[scopeId] ?? { pageSize: 25, sortBy: "conversation_timestamp", sortDir: -1 };
+  } catch {
+    return { pageSize: 25, sortBy: "conversation_timestamp", sortDir: -1 };
+  }
+}
+
+function savePrefs(scopeId: string, prefs: CampaignPrefs) {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    const all = raw ? JSON.parse(raw) : {};
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ ...all, [scopeId]: prefs }));
+  } catch {
+    // ignore
+  }
+}
+
+type MetaRow = { key: string; value: string };
+
+// ---- Filter panel ----
+
+// Field/op options are built inside FilterRow to pick up live translations
+
+function isNumericField(f: FilterField) {
+  return f === "stats.word_count" || f === "stats.duration_seconds";
+}
+
+function FilterRow({
+  filter,
+  onChange,
+  onRemove,
+}: {
+  filter: ConvFilter;
+  onChange: (f: ConvFilter) => void;
+  onRemove: () => void;
+}) {
+  const { t } = useTranslation();
+  const fieldOptions = [
+    { value: "title", label: t("conversations.filterFields.title") },
+    { value: "content", label: t("conversations.filterFields.content") },
+    { value: "meta", label: t("conversations.filterFields.meta") },
+    { value: "stats.word_count", label: t("conversations.filterFields.wordCount") },
+    { value: "stats.duration_seconds", label: t("conversations.filterFields.duration") },
+  ];
+  const stringOps = [
+    { value: "eq", label: "==" },
+    { value: "contains", label: "contains" },
+    { value: "regex", label: "regex" },
+  ];
+  const numOps = [
+    { value: "eq", label: "==" },
+    { value: "gt", label: ">" },
+    { value: "gte", label: ">=" },
+    { value: "lt", label: "<" },
+    { value: "lte", label: "<=" },
+  ];
+  const ops = isNumericField(filter.field) ? numOps : stringOps;
+  return (
+    <Group gap={6} wrap="nowrap" align="flex-end">
+      <Select
+        size="xs"
+        style={{ width: 140 }}
+        data={fieldOptions}
+        value={filter.field}
+        onChange={(v) =>
+          onChange({ ...filter, field: v as FilterField, op: "eq", value: "", meta_key: "" })
+        }
+      />
+      {filter.field === "meta" && (
+        <TextInput
+          size="xs"
+          placeholder="key"
+          style={{ width: 90 }}
+          value={filter.meta_key ?? ""}
+          onChange={(e) => onChange({ ...filter, meta_key: e.currentTarget.value })}
+        />
+      )}
+      <Select
+        size="xs"
+        style={{ width: 90 }}
+        data={ops}
+        value={filter.op}
+        onChange={(v) => onChange({ ...filter, op: v as FilterOp })}
+      />
+      <TextInput
+        size="xs"
+        placeholder="value"
+        style={{ flex: 1 }}
+        value={filter.value}
+        onChange={(e) => onChange({ ...filter, value: e.currentTarget.value })}
+      />
+      <ActionIcon size="xs" variant="subtle" color="red" onClick={onRemove}>
+        <IconTrash size={14} />
+      </ActionIcon>
+    </Group>
+  );
+}
+
+function FilterPanel({
+  value,
+  onChange,
+  tagOptions,
+  draftTagIds,
+  onTagIdsChange,
+  onApply,
+  onClear,
+}: {
+  value: ConvFilter[];
+  onChange: (v: ConvFilter[]) => void;
+  tagOptions: { value: string; label: string }[];
+  draftTagIds: string[];
+  onTagIdsChange: (ids: string[]) => void;
+  onApply: () => void;
+  onClear: () => void;
+}) {
+  const { t } = useTranslation();
+  const add = () =>
+    onChange([...value, { field: "content", op: "contains", value: "", meta_key: "" }]);
+  const update = (i: number, f: ConvFilter) => onChange(value.map((r, idx) => (idx === i ? f : r)));
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+
+  return (
+    <Paper withBorder p="xs" radius="sm">
+      <Stack gap={6}>
+        {tagOptions.length > 0 && (
+          <MultiSelect
+            size="xs"
+            placeholder={t("conversations.filterByTag")}
+            data={tagOptions}
+            value={draftTagIds}
+            onChange={onTagIdsChange}
+            clearable
+          />
+        )}
+        {value.map((f, i) => (
+          <FilterRow
+            key={i}
+            filter={f}
+            onChange={(nf) => update(i, nf)}
+            onRemove={() => remove(i)}
+          />
+        ))}
+        <Group justify="space-between">
+          <Button size="xs" variant="subtle" leftSection={<IconPlus size={13} />} onClick={add}>
+            {t("conversations.addFilter")}
+          </Button>
+          <Group gap={6}>
+            <Button size="xs" variant="subtle" color="dimmed" onClick={onClear}>
+              {t("common.clear")}
+            </Button>
+            <Button size="xs" onClick={onApply} leftSection={<IconSearch size={13} />}>
+              {t("common.search")}
+            </Button>
+          </Group>
+        </Group>
+      </Stack>
+    </Paper>
+  );
+}
+
+function MetadataEditor({
+  value,
+  onChange,
+}: {
+  value: MetaRow[];
+  onChange: (v: MetaRow[]) => void;
+}) {
+  const { t } = useTranslation();
+  const add = () => onChange([...value, { key: "", value: "" }]);
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+  const set = (i: number, field: "key" | "value", v: string) =>
+    onChange(value.map((r, idx) => (idx === i ? { ...r, [field]: v } : r)));
+
+  return (
+    <Stack gap={6}>
+      <Group justify="space-between">
+        <Text size="sm" fw={500}>
+          {t("conversations.metadataLabel")}
+        </Text>
+        <ActionIcon size="xs" variant="subtle" onClick={add}>
+          <IconPlus size={14} />
+        </ActionIcon>
+      </Group>
+      {value.map((row, i) => (
+        <Group key={i} gap={6} wrap="nowrap">
+          <TextInput
+            placeholder={t("conversations.metaKey")}
+            value={row.key}
+            onChange={(e) => set(i, "key", e.currentTarget.value)}
+            style={{ flex: 1 }}
+            size="xs"
+          />
+          <TextInput
+            placeholder={t("conversations.metaValue")}
+            value={row.value}
+            onChange={(e) => set(i, "value", e.currentTarget.value)}
+            style={{ flex: 2 }}
+            size="xs"
+          />
+          <ActionIcon size="xs" variant="subtle" color="red" onClick={() => remove(i)}>
+            <IconTrash size={14} />
+          </ActionIcon>
+        </Group>
+      ))}
+      {value.length === 0 && (
+        <Text size="xs" c="dimmed">
+          {t("conversations.noMetadata")}
+        </Text>
+      )}
+    </Stack>
+  );
+}
+
+type TurnRow = { speaker: string; text: string };
+
+function SpeakerTurnsEditor({
+  value,
+  onChange,
+}: {
+  value: TurnRow[];
+  onChange: (v: TurnRow[]) => void;
+}) {
+  const { t } = useTranslation();
+  const add = () => {
+    const last = value[value.length - 1];
+    const nextSpeaker = last?.speaker === "Speaker A" ? "Speaker B" : "Speaker A";
+    onChange([...value, { speaker: nextSpeaker, text: "" }]);
+  };
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+  const set = (i: number, field: "speaker" | "text", v: string) =>
+    onChange(value.map((r, idx) => (idx === i ? { ...r, [field]: v } : r)));
+
+  return (
+    <Stack gap={8}>
+      {value.map((row, i) => (
+        <Stack key={i} gap={4}>
+          <Group gap={6} wrap="nowrap">
+            <TextInput
+              placeholder="Speaker A"
+              value={row.speaker}
+              onChange={(e) => set(i, "speaker", e.currentTarget.value)}
+              size="xs"
+              style={{ width: 120 }}
+            />
+            <ActionIcon size="xs" variant="subtle" color="red" onClick={() => remove(i)} ml="auto">
+              <IconTrash size={14} />
+            </ActionIcon>
+          </Group>
+          <Textarea
+            placeholder="What they said…"
+            value={row.text}
+            onChange={(e) => set(i, "text", e.currentTarget.value)}
+            rows={2}
+            size="xs"
+          />
+        </Stack>
+      ))}
+      <Button size="xs" variant="subtle" leftSection={<IconPlus size={14} />} onClick={add}>
+        {t("conversations.addTurn")}
+      </Button>
+    </Stack>
+  );
+}
+
+interface Props {
+  organizationId: string;
+  scopeId: string;
+  scopeType?: "campaign";
+  queryKey: string[];
+}
+
+export function ConversationsSection({ organizationId, scopeId, scopeType, queryKey }: Props) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [createOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
+  const [uploadOpened, { open: openUpload, close: closeUpload }] = useDisclosure(false);
+  const [editConv, setEditConv] = useState<ConversationResponse | null>(null);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [contentMode, setContentMode] = useState<"text" | "turns">("text");
+  const [turns, setTurns] = useState<TurnRow[]>([{ speaker: "Speaker A", text: "" }]);
+  const [metadata, setMetadata] = useState<MetaRow[]>([]);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [conversationTs, setConversationTs] = useState("");
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadConversationTs, setUploadConversationTs] = useState("");
+  const [uploadMetadata, setUploadMetadata] = useState<MetaRow[]>([]);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
+  const { data: orgTags } = useQuery({
+    queryKey: ["tags", organizationId],
+    queryFn: () => listTags(organizationId),
+    retry: false,
+  });
+
+  const { data: myRoles } = useMyRoles(organizationId);
+  const scopeRole =
+    scopeType === "campaign" ? (myRoles?.campaigns?.[scopeId] ?? null) : (myRoles?.org ?? null);
+  const canWriteScope = canWrite(scopeRole);
+
+  // Search / pagination / sort state — initialized from per-campaign localStorage prefs
+  const initialPrefs = loadPrefs(scopeId);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPrefs.pageSize);
+  const [filtersOpen, { toggle: toggleFilters }] = useDisclosure(false);
+  const [activeFilters, setActiveFilters] = useState<ConvFilter[]>([]);
+  const [draftFilters, setDraftFilters] = useState<ConvFilter[]>([]);
+  const [activeTagIds, setActiveTagIds] = useState<string[]>([]);
+  const [draftTagIds, setDraftTagIds] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState(initialPrefs.sortBy);
+  const [sortDir, setSortDir] = useState(initialPrefs.sortDir);
+
+  // Persist prefs whenever they change
+  useEffect(() => {
+    savePrefs(scopeId, { pageSize, sortBy, sortDir });
+  }, [scopeId, pageSize, sortBy, sortDir]);
+
+  const toggleSort = (field: string) => {
+    if (sortBy === field) setSortDir((d) => (d === -1 ? 1 : -1));
+    else {
+      setSortBy(field);
+      setSortDir(-1);
+    }
+    setPage(1);
+  };
+
+  // A conversation is "pending transcript" if type="conversation" but content is empty (awaiting transcription).
+  const [hasPending, setHasPending] = useState(false);
+  const sseConnected = useSSEConnected();
+  // SSE drives invalidation when connected; fall back to backoff polling otherwise.
+  const refetchInterval = useBackoffInterval(!sseConnected && hasPending);
+
+  const scopeParams =
+    scopeId && scopeType
+      ? { scope_id: scopeId, scope_type: scopeType }
+      : { organization_id: organizationId };
+
+  const { data, isLoading, error, dataUpdatedAt } = useQuery({
+    queryKey: [
+      "conversations",
+      ...queryKey,
+      page,
+      pageSize,
+      activeFilters,
+      activeTagIds,
+      sortBy,
+      sortDir,
+    ],
+    queryFn: () =>
+      searchConversations(scopeParams, {
+        filters: activeFilters,
+        tag_ids: activeTagIds.length ? activeTagIds : undefined,
+        page,
+        page_size: pageSize,
+        sort_by: sortBy,
+        sort_dir: sortDir,
+      }),
+    retry: false,
+    refetchInterval,
+  });
+
+  useEffect(() => {
+    if (!data) return;
+    const pending = data.items.some(
+      (c) => c.type === "conversation" && Array.isArray(c.content) && c.content.length === 0
+    );
+    setHasPending(pending);
+  }, [dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["conversations", ...queryKey] });
+
+  const createMutation = useMutation({
+    mutationFn: () => {
+      const isConversation = contentMode === "turns";
+      const structuredContent = isConversation
+        ? turns.map((t) => ({ speaker: t.speaker, text: t.text, words: [] }))
+        : content;
+      return createConversation({
+        title,
+        content: structuredContent,
+        type: isConversation ? "conversation" : "review",
+        conversation_timestamp: conversationTs ? new Date(conversationTs).toISOString() : undefined,
+        metadata: metadata.filter((m) => m.key.trim()),
+        organization_id: organizationId,
+        scope_id: scopeId,
+        scope_type: "campaign",
+      });
+    },
+    onSuccess: () => {
+      invalidate();
+      closeCreate();
+      setTitle("");
+      setContent("");
+      setTurns([{ speaker: "Speaker A", text: "" }]);
+      setMetadata([]);
+      setContentMode("text");
+      setConversationTs("");
+    },
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async () => {
+      if (!audioFile) throw new Error("No file selected");
+      const conv = await createConversation({
+        title: uploadTitle || audioFile.name,
+        content: [],
+        type: "conversation",
+        conversation_timestamp: uploadConversationTs
+          ? new Date(uploadConversationTs).toISOString()
+          : undefined,
+        metadata: uploadMetadata.filter((m) => m.key.trim()),
+        organization_id: organizationId,
+        scope_id: scopeId,
+        scope_type: "campaign",
+      });
+      await uploadAudio(conv.id, organizationId, scopeId, scopeType ?? "campaign", audioFile);
+    },
+    onSuccess: () => {
+      invalidate();
+      closeUpload();
+      setUploadTitle("");
+      setUploadConversationTs("");
+      setUploadMetadata([]);
+      setAudioFile(null);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: () => updateConversation(editConv!.id, { title: editTitle, content: editContent }),
+    onSuccess: () => {
+      invalidate();
+      setEditConv(null);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteConversation(id),
+    onSuccess: invalidate,
+  });
+
+  const openEdit = (conv: ConversationResponse) => {
+    setEditConv(conv);
+    setEditTitle(conv.title);
+    setEditContent(typeof conv.content === "string" ? conv.content : "");
+  };
+
+  const canMutate = (conv: ConversationResponse) => me?.id === conv.created_by;
+
+  return (
+    <>
+      {/* Create modal */}
+      <Modal
+        opened={createOpened}
+        onClose={closeCreate}
+        title={t("conversations.newTitle")}
+        centered
+        size="lg"
+      >
+        <Stack>
+          <TextInput
+            label={t("conversations.titleLabel")}
+            placeholder={t("conversations.titlePlaceholder")}
+            value={title}
+            onChange={(e) => setTitle(e.currentTarget.value)}
+            data-autofocus
+          />
+          <Stack gap={6}>
+            <Group justify="space-between" align="center">
+              <Text size="sm" fw={500}>
+                {t("conversations.contentLabel")}
+              </Text>
+              <SegmentedControl
+                size="xs"
+                value={contentMode}
+                onChange={(v) => setContentMode(v as "text" | "turns")}
+                data={[
+                  { label: t("conversations.modeText"), value: "text" },
+                  { label: t("conversations.modeTurns"), value: "turns" },
+                ]}
+              />
+            </Group>
+            {contentMode === "text" ? (
+              <Textarea
+                placeholder={t("conversations.contentPlaceholder")}
+                value={content}
+                onChange={(e) => setContent(e.currentTarget.value)}
+                rows={4}
+              />
+            ) : (
+              <SpeakerTurnsEditor value={turns} onChange={setTurns} />
+            )}
+          </Stack>
+          <Stack gap={4}>
+            <Text size="sm" fw={500}>
+              {t("conversations.dateTime")}
+            </Text>
+            <input
+              type="datetime-local"
+              value={conversationTs}
+              onChange={(e) => setConversationTs(e.currentTarget.value)}
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                borderRadius: 4,
+                border: "1px solid #ced4da",
+                fontSize: 14,
+              }}
+            />
+          </Stack>
+          <MetadataEditor value={metadata} onChange={setMetadata} />
+          {createMutation.isError && (
+            <Text size="sm" c="red">
+              {String(createMutation.error)}
+            </Text>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeCreate}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
+              {t("common.create")}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Upload audio modal */}
+      <Modal
+        opened={uploadOpened}
+        onClose={closeUpload}
+        title={t("conversations.uploadTitle")}
+        centered
+        size="md"
+      >
+        <Stack>
+          <TextInput
+            label={t("conversations.titleLabel")}
+            placeholder={t("conversations.titlePlaceholder")}
+            value={uploadTitle}
+            onChange={(e) => setUploadTitle(e.currentTarget.value)}
+          />
+          <Stack gap={4}>
+            <Text size="sm" fw={500}>
+              {t("conversations.audioFile")}
+            </Text>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac"
+              style={{ display: "none" }}
+              onChange={(e) => setAudioFile(e.target.files?.[0] ?? null)}
+            />
+            <Group>
+              <Button variant="default" size="xs" onClick={() => fileRef.current?.click()}>
+                {t("conversations.chooseFile")}
+              </Button>
+              {audioFile && (
+                <Text size="xs" c="dimmed">
+                  {audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(1)} MB)
+                </Text>
+              )}
+            </Group>
+          </Stack>
+          <Stack gap={4}>
+            <Text size="sm" fw={500}>
+              {t("conversations.dateTime")}
+            </Text>
+            <input
+              type="datetime-local"
+              value={uploadConversationTs}
+              onChange={(e) => setUploadConversationTs(e.currentTarget.value)}
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                borderRadius: 4,
+                border: "1px solid #ced4da",
+                fontSize: 14,
+              }}
+            />
+          </Stack>
+          <MetadataEditor value={uploadMetadata} onChange={setUploadMetadata} />
+          {uploadMutation.isPending && <Progress animated value={100} size="xs" />}
+          {uploadMutation.isError && (
+            <Text size="sm" c="red">
+              {String(uploadMutation.error)}
+            </Text>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeUpload} disabled={uploadMutation.isPending}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={() => uploadMutation.mutate()}
+              loading={uploadMutation.isPending}
+              disabled={!audioFile}
+            >
+              {t("conversations.uploadAndTranscribe")}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Edit modal */}
+      <Modal
+        opened={editConv !== null}
+        onClose={() => setEditConv(null)}
+        title={t("conversations.editTitle")}
+        centered
+        size="lg"
+      >
+        <Stack>
+          <TextInput
+            label={t("conversations.titleLabel")}
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.currentTarget.value)}
+            data-autofocus
+          />
+          <Textarea
+            label={t("conversations.contentLabel")}
+            value={editContent}
+            onChange={(e) => setEditContent(e.currentTarget.value)}
+            rows={4}
+          />
+          {updateMutation.isError && (
+            <Text size="sm" c="red">
+              {String(updateMutation.error)}
+            </Text>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setEditConv(null)}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={() => updateMutation.mutate()} loading={updateMutation.isPending}>
+              {t("common.save")}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Stack gap="sm" style={{ flex: 1, minHeight: 0 }}>
+        <Group justify="space-between">
+          <Group gap={6}>
+            <Text fw={600} size="sm" c="dimmed">
+              {t("conversations.sectionTitle")}
+            </Text>
+            {(["conversation_timestamp", "title", "stats.duration_seconds"] as const).map(
+              (field) => {
+                const labels: Record<string, string> = {
+                  conversation_timestamp: t("conversations.sortDate"),
+                  title: t("conversations.sortTitle"),
+                  "stats.duration_seconds": t("conversations.sortDuration"),
+                };
+                const active = sortBy === field;
+                return (
+                  <Button
+                    key={field}
+                    size="xs"
+                    variant={active ? "light" : "subtle"}
+                    onClick={() => toggleSort(field)}
+                    rightSection={active ? (sortDir === -1 ? "↓" : "↑") : undefined}
+                  >
+                    {labels[field]}
+                  </Button>
+                );
+              }
+            )}
+          </Group>
+          <Group gap={6}>
+            <ActionIcon
+              size="sm"
+              variant="subtle"
+              onClick={toggleFilters}
+              title={t("common.search")}
+            >
+              <IconSearch size={14} />
+            </ActionIcon>
+            {canWriteScope && (
+              <Button size="xs" variant="light" color="teal" onClick={openUpload}>
+                {t("conversations.uploadAudio")}
+              </Button>
+            )}
+            {canWriteScope && (
+              <Button size="xs" variant="light" onClick={openCreate}>
+                {t("conversations.new")}
+              </Button>
+            )}
+          </Group>
+        </Group>
+
+        <Collapse expanded={filtersOpen}>
+          <FilterPanel
+            value={draftFilters}
+            onChange={setDraftFilters}
+            tagOptions={(orgTags ?? []).map((t) => ({ value: t.id, label: t.name }))}
+            draftTagIds={draftTagIds}
+            onTagIdsChange={setDraftTagIds}
+            onApply={() => {
+              const badRegex = draftFilters.find((f) => {
+                if (f.op !== "regex") return false;
+                try {
+                  new RegExp(f.value);
+                  return false;
+                } catch {
+                  return true;
+                }
+              });
+              if (badRegex) {
+                notifications.show({
+                  color: "red",
+                  title: t("conversations.invalidRegex"),
+                  message: t("conversations.invalidRegexMsg", { value: badRegex.value }),
+                });
+                return;
+              }
+              setActiveFilters(draftFilters);
+              setActiveTagIds(draftTagIds);
+              setPage(1);
+            }}
+            onClear={() => {
+              setDraftFilters([]);
+              setActiveFilters([]);
+              setDraftTagIds([]);
+              setActiveTagIds([]);
+              setPage(1);
+            }}
+          />
+        </Collapse>
+
+        <ScrollArea style={{ flex: 1 }} type="auto">
+          <Stack gap="sm">
+            {isLoading && <Loader size="sm" />}
+            {error && <Alert color="red">{String(error)}</Alert>}
+            {data?.items.length === 0 && (
+              <Text size="sm" c="dimmed">
+                {t("conversations.noResults")}
+              </Text>
+            )}
+            {data?.items.map((conv) => (
+              <ConversationCard
+                key={conv.id}
+                conv={conv}
+                tagMap={Object.fromEntries((orgTags ?? []).map((t) => [t.id, t.name]))}
+                canMutate={canMutate(conv)}
+                onEdit={() => openEdit(conv)}
+                onDelete={() => deleteMutation.mutate(conv.id)}
+                deleteLoading={deleteMutation.isPending && deleteMutation.variables === conv.id}
+              />
+            ))}
+          </Stack>
+        </ScrollArea>
+
+        <Group justify="space-between" align="center" mt="xs">
+          <Select
+            size="xs"
+            style={{ width: 80 }}
+            data={PAGE_SIZE_OPTIONS}
+            value={String(pageSize)}
+            onChange={(v) => {
+              if (v) {
+                setPageSize(Number(v));
+                setPage(1);
+              }
+            }}
+          />
+          {data && data.total > pageSize && (
+            <Pagination
+              total={Math.ceil(data.total / pageSize)}
+              value={page}
+              onChange={setPage}
+              size="sm"
+            />
+          )}
+        </Group>
+      </Stack>
+      <Divider mt="xl" />
+    </>
+  );
+}
+
+function ConversationCard({
+  conv,
+  tagMap,
+  canMutate,
+  onEdit,
+  onDelete,
+  deleteLoading,
+}: {
+  conv: ConversationResponse;
+  tagMap: Record<string, string>;
+  canMutate: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  deleteLoading: boolean;
+}) {
+  const { t } = useTranslation();
+  // Poll imports to know if a file was uploaded (determines if transcription badge should show)
+  const { data: importJobs } = useQuery({
+    queryKey: ["import-jobs", conv.id],
+    queryFn: () => getImportJobs(conv.id),
+    retry: false,
+  });
+
+  const hasAudio = (importJobs?.length ?? 0) > 0;
+  const hasTranscript =
+    conv.type === "conversation" && Array.isArray(conv.content) && conv.content.length > 0;
+  const isTranscribing = hasAudio && !hasTranscript;
+
+  const ts = new Date(conv.conversation_timestamp);
+  const dateStr = ts.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const timeStr = ts.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <Paper withBorder p="sm" radius="sm">
+      <Group align="flex-start" wrap="nowrap" gap="sm">
+        {/* Date column */}
+        <Stack gap={0} style={{ width: 72, flexShrink: 0, textAlign: "right" }}>
+          <Text size="xs" fw={500} c="dimmed">
+            {dateStr}
+          </Text>
+          <Text size="xs" c="dimmed">
+            {timeStr}
+          </Text>
+        </Stack>
+
+        <Divider orientation="vertical" />
+
+        {/* Content */}
+        <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+          <Group gap={6} wrap="nowrap">
+            <Text
+              fw={500}
+              size="sm"
+              component={Link}
+              to={`/conversations/${conv.id}`}
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              {conv.title}
+            </Text>
+            {isTranscribing && (
+              <Badge size="xs" color="yellow" variant="dot">
+                {t("conversations.transcribing")}
+              </Badge>
+            )}
+            {hasTranscript && (
+              <Badge size="xs" color="teal" variant="dot">
+                {t("conversations.transcript")}
+              </Badge>
+            )}
+          </Group>
+          {conv.type === "review" && typeof conv.content === "string" && conv.content && (
+            <Text size="xs" c="dimmed" lineClamp={2}>
+              {conv.content}
+            </Text>
+          )}
+          {conv.stats.duration_seconds != null && (
+            <Text size="xs" c="dimmed">
+              {Math.round(conv.stats.duration_seconds)}s · {conv.stats.word_count} words
+            </Text>
+          )}
+          {conv.tag_ids.length > 0 && (
+            <Group gap={4}>
+              {conv.tag_ids.map((id) => (
+                <Badge key={id} size="xs" variant="light" color="violet">
+                  {tagMap[id] ?? id}
+                </Badge>
+              ))}
+            </Group>
+          )}
+          {conv.metadata.length > 0 && (
+            <Group gap={4}>
+              {conv.metadata.map((m) => (
+                <Badge key={m.key} size="xs" variant="outline" color="gray">
+                  {m.key}: {m.value}
+                </Badge>
+              ))}
+            </Group>
+          )}
+        </Stack>
+
+        {canMutate && (
+          <Group gap={4} wrap="nowrap">
+            <Button size="xs" variant="subtle" onClick={onEdit}>
+              {t("common.edit")}
+            </Button>
+            <Button
+              size="xs"
+              variant="subtle"
+              color="red"
+              loading={deleteLoading}
+              onClick={onDelete}
+            >
+              {t("common.delete")}
+            </Button>
+          </Group>
+        )}
+      </Group>
+    </Paper>
+  );
+}

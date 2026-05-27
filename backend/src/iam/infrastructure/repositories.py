@@ -1,0 +1,180 @@
+from uuid import UUID
+
+from src.iam.domain.models import ApiKey, Avatar, Group, User
+from src.iam.domain.repositories import (
+    ApiKeyRepository,
+    AvatarRepository,
+    GroupRepository,
+    UserRepository,
+)
+from src.shared.mongo_repository import MongoRepository
+
+# ---------------------------------------------------------------------------
+# User
+# ---------------------------------------------------------------------------
+
+
+def _user_to_doc(user: User) -> dict:
+    return {
+        "_id": user.id,
+        "email": user.email,
+        "password_hash": user.password_hash,
+        "locale": user.locale,
+        "created_at": user.created_at,
+    }
+
+
+def _user_from_doc(doc: dict) -> User:
+    return User(
+        id=doc["_id"],
+        email=doc["email"],
+        password_hash=doc["password_hash"],
+        locale=doc.get("locale", "en"),
+        created_at=doc["created_at"],
+    )
+
+
+class MongoUserRepository(MongoRepository, UserRepository):
+    collection_name = "iam_users"
+
+    async def save(self, user: User) -> None:
+        await self._col.insert_one(_user_to_doc(user))
+
+    async def find_by_email(self, email: str) -> User | None:
+        doc = await self._col.find_one({"email": email})
+        return _user_from_doc(doc) if doc else None
+
+    async def find_by_id(self, user_id: UUID) -> User | None:
+        doc = await self._col.find_one({"_id": user_id})
+        return _user_from_doc(doc) if doc else None
+
+    async def update(self, user: User) -> None:
+        doc = _user_to_doc(user)
+        doc.pop("_id")
+        await self._col.update_one({"_id": user.id}, {"$set": doc})
+
+    async def find_all(self) -> list[User]:
+        docs = await self._col.find({}).to_list(length=2000)
+        return [_user_from_doc(d) for d in docs]
+
+
+# ---------------------------------------------------------------------------
+# Group
+# ---------------------------------------------------------------------------
+
+
+def _group_to_doc(group: Group) -> dict:
+    return {
+        "_id": group.id,
+        "name": group.name,
+        "org_id": group.org_id,
+        "owner_id": group.owner_id,
+        "member_ids": list(group.member_ids),
+        "created_at": group.created_at,
+    }
+
+
+def _group_from_doc(doc: dict) -> Group:
+    return Group(
+        id=doc["_id"],
+        name=doc["name"],
+        org_id=doc["org_id"],
+        owner_id=doc["owner_id"],
+        member_ids=list(doc.get("member_ids", [])),
+        created_at=doc["created_at"],
+    )
+
+
+class MongoGroupRepository(MongoRepository, GroupRepository):
+    collection_name = "iam_groups"
+
+    async def save(self, group: Group) -> None:
+        await self._col.replace_one({"_id": group.id}, _group_to_doc(group), upsert=True)
+
+    async def find_by_id(self, group_id: UUID) -> Group | None:
+        doc = await self._col.find_one({"_id": group_id})
+        return _group_from_doc(doc) if doc else None
+
+    async def find_by_org(self, org_id: UUID) -> list[Group]:
+        docs = await self._col.find({"org_id": org_id}).to_list(length=500)
+        return [_group_from_doc(d) for d in docs]
+
+    async def find_by_member_in_org(self, user_id: UUID, org_id: UUID) -> list[Group]:
+        docs = await self._col.find({"org_id": org_id, "member_ids": user_id}).to_list(length=500)
+        return [_group_from_doc(d) for d in docs]
+
+    async def delete(self, group_id: UUID) -> None:
+        await self._col.delete_one({"_id": group_id})
+
+
+# ---------------------------------------------------------------------------
+# ApiKey
+# ---------------------------------------------------------------------------
+
+
+def _apikey_to_doc(key: ApiKey) -> dict:
+    return {
+        "_id": key.id,
+        "name": key.name,
+        "key_hash": key.key_hash,
+        "key_prefix": key.key_prefix,
+        "owner_id": key.owner_id,
+        "scope_type": key.scope_type,
+        "scope_id": key.scope_id,
+        "created_at": key.created_at,
+    }
+
+
+def _apikey_from_doc(doc: dict) -> ApiKey:
+    return ApiKey(
+        id=doc["_id"],
+        name=doc["name"],
+        key_hash=doc["key_hash"],
+        key_prefix=doc["key_prefix"],
+        owner_id=doc["owner_id"],
+        scope_type=doc.get("scope_type"),
+        scope_id=doc.get("scope_id"),
+        created_at=doc["created_at"],
+    )
+
+
+class MongoApiKeyRepository(MongoRepository, ApiKeyRepository):
+    collection_name = "iam_api_keys"
+
+    async def save(self, api_key: ApiKey) -> None:
+        await self._col.insert_one(_apikey_to_doc(api_key))
+
+    async def find_by_id(self, key_id: UUID) -> ApiKey | None:
+        doc = await self._col.find_one({"_id": key_id})
+        return _apikey_from_doc(doc) if doc else None
+
+    async def find_by_hash(self, key_hash: str) -> ApiKey | None:
+        doc = await self._col.find_one({"key_hash": key_hash})
+        return _apikey_from_doc(doc) if doc else None
+
+    async def find_by_owner(self, owner_id: UUID) -> list[ApiKey]:
+        docs = await self._col.find({"owner_id": owner_id}).to_list(length=200)
+        return [_apikey_from_doc(d) for d in docs]
+
+    async def delete(self, key_id: UUID) -> None:
+        await self._col.delete_one({"_id": key_id})
+
+
+class MongoAvatarRepository(MongoRepository, AvatarRepository):
+    collection_name = "avatars"
+
+    async def save(self, avatar: Avatar) -> None:
+        await self._col.replace_one(
+            {"_id": avatar.user_id},
+            {"_id": avatar.user_id, "data": avatar.data, "content_type": avatar.content_type},
+            upsert=True,
+        )
+
+    async def find_by_user(self, user_id: UUID) -> Avatar | None:
+        doc = await self._col.find_one({"_id": user_id})
+        if not doc:
+            return None
+        return Avatar(user_id=doc["_id"], data=doc["data"], content_type=doc["content_type"])
+
+    async def delete(self, user_id: UUID) -> None:
+        await self._col.delete_one({"_id": user_id})

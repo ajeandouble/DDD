@@ -1,0 +1,277 @@
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+
+from src.iam.application.authorization_service import AuthorizationService
+from src.iam.domain.models import User
+from src.shared.database import get_db
+from src.shared.exceptions import WebhookAccessDenied
+from src.shared.deps import get_authz, get_current_user, get_quota_service
+from src.webhooks.application import run_transformer
+from src.webhooks.domain import WebhookEndpoint
+from src.webhooks.infrastructure.repositories import (
+    MongoDeliveryRepository,
+    MongoWebhookEndpointRepository,
+)
+
+router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+
+SUPPORTED_EVENTS = ["conversation.transcribed"]
+
+
+def _ep_repo():
+    return MongoWebhookEndpointRepository(get_db())
+
+
+def _del_repo():
+    return MongoDeliveryRepository(get_db())
+
+
+async def _require_admin(org_id: UUID, user: User, authz: AuthorizationService) -> None:
+    role = await authz.effective_role(f"user:{user.id}", "org", str(org_id), org_id=str(org_id))
+    if role not in ("admin",) and not authz.is_superadmin(f"user:{user.id}"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
+
+
+# --- Schemas ---
+
+
+SUPPORTED_TRIGGER_SCOPES = {"project", "subproject", "campaign"}
+
+
+class EndpointCreate(BaseModel):
+    url: str
+    secret: str = ""
+    event_types: list[str] = ["conversation.transcribed"]
+    transformer: str = "result = payload"
+    enabled: bool = True
+    trigger_scope: str | None = None
+    trigger_scope_id: UUID | None = None
+
+
+class EndpointUpdate(BaseModel):
+    url: str | None = None
+    secret: str | None = None
+    event_types: list[str] | None = None
+    transformer: str | None = None
+    enabled: bool | None = None
+    trigger_scope: str | None = None
+    trigger_scope_id: UUID | None = None
+
+
+class EndpointResponse(BaseModel):
+    id: UUID
+    org_id: UUID
+    url: str
+    secret: str
+    event_types: list[str]
+    transformer: str
+    enabled: bool
+    trigger_scope: str | None
+    trigger_scope_id: UUID | None
+    created_at: str
+
+
+class DeliveryResponse(BaseModel):
+    id: UUID
+    endpoint_id: UUID
+    event_type: str
+    payload_sent: dict
+    status: str
+    response_code: int | None
+    error: str | None
+    created_at: str
+
+
+class TransformerTestBody(BaseModel):
+    transformer: str
+    payload: dict
+
+
+class TransformerTestResponse(BaseModel):
+    result: dict | None
+    error: str | None
+    stdout: str
+
+
+_VALIDATION_PAYLOAD = {
+    "event": "conversation.transcribed",
+    "conversation_id": "00000000-0000-0000-0000-000000000000",
+    "org_id": "00000000-0000-0000-0000-000000000002",
+    "title": "Test",
+    "content": [{"speaker": "A", "text": "hello", "words": []}],
+    "stats": {"word_count": 1, "duration_seconds": 1.0},
+}
+
+
+def _validate_transformer(transformer: str) -> None:
+    _, error, _ = run_transformer(transformer, _VALIDATION_PAYLOAD)
+    if error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error)
+
+
+def _ep_resp(ep: WebhookEndpoint) -> EndpointResponse:
+    return EndpointResponse(
+        id=ep.id,
+        org_id=ep.org_id,
+        url=ep.url,
+        secret=ep.secret,
+        event_types=ep.event_types,
+        transformer=ep.transformer,
+        enabled=ep.enabled,
+        trigger_scope=ep.trigger_scope,
+        trigger_scope_id=ep.trigger_scope_id,
+        created_at=ep.created_at.isoformat(),
+    )
+
+
+# --- Endpoints CRUD ---
+
+
+@router.get("/organizations/{org_id}/endpoints", response_model=list[EndpointResponse])
+async def list_endpoints(
+    org_id: UUID,
+    repo: MongoWebhookEndpointRepository = Depends(_ep_repo),
+    user: User = Depends(get_current_user),
+    authz: AuthorizationService = Depends(get_authz),
+    quota=Depends(get_quota_service),
+):
+    await _require_admin(org_id, user, authz)
+    try:
+        await quota.check_webhook_access(org_id)
+    except WebhookAccessDenied:
+        return []
+    return [_ep_resp(ep) for ep in await repo.find_by_org(org_id)]
+
+
+@router.post("/organizations/{org_id}/endpoints", response_model=EndpointResponse, status_code=201)
+async def create_endpoint(
+    org_id: UUID,
+    body: EndpointCreate,
+    repo: MongoWebhookEndpointRepository = Depends(_ep_repo),
+    user: User = Depends(get_current_user),
+    authz: AuthorizationService = Depends(get_authz),
+    quota=Depends(get_quota_service),
+):
+    await _require_admin(org_id, user, authz)
+    try:
+        await quota.check_webhook_access(org_id)
+    except WebhookAccessDenied as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    for et in body.event_types:
+        if et not in SUPPORTED_EVENTS:
+            raise HTTPException(400, f"Unknown event type: {et}")
+    if body.trigger_scope is not None and body.trigger_scope not in SUPPORTED_TRIGGER_SCOPES:
+        raise HTTPException(400, f"Invalid trigger_scope: {body.trigger_scope}")
+    if body.trigger_scope is not None and body.trigger_scope_id is None:
+        raise HTTPException(400, "trigger_scope_id required when trigger_scope is set")
+    _validate_transformer(body.transformer)
+    ep = WebhookEndpoint.create(
+        org_id=org_id,
+        url=body.url,
+        secret=body.secret,
+        transformer=body.transformer,
+    )
+    ep.event_types = body.event_types
+    ep.enabled = body.enabled
+    ep.trigger_scope = body.trigger_scope
+    ep.trigger_scope_id = body.trigger_scope_id
+    await repo.save(ep)
+    return _ep_resp(ep)
+
+
+@router.patch("/organizations/{org_id}/endpoints/{ep_id}", response_model=EndpointResponse)
+async def update_endpoint(
+    org_id: UUID,
+    ep_id: UUID,
+    body: EndpointUpdate,
+    repo: MongoWebhookEndpointRepository = Depends(_ep_repo),
+    user: User = Depends(get_current_user),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    await _require_admin(org_id, user, authz)
+    ep = await repo.find_by_id(ep_id)
+    if ep is None or ep.org_id != org_id:
+        raise HTTPException(404)
+    if body.url is not None:
+        ep.url = body.url
+    if body.secret is not None:
+        ep.secret = body.secret
+    if body.event_types is not None:
+        ep.event_types = body.event_types
+    if body.transformer is not None:
+        _validate_transformer(body.transformer)
+        ep.transformer = body.transformer
+    if body.enabled is not None:
+        ep.enabled = body.enabled
+    if "trigger_scope" in body.model_fields_set:
+        if body.trigger_scope is not None and body.trigger_scope not in SUPPORTED_TRIGGER_SCOPES:
+            raise HTTPException(400, f"Invalid trigger_scope: {body.trigger_scope}")
+        if body.trigger_scope is not None and body.trigger_scope_id is None:
+            raise HTTPException(400, "trigger_scope_id required when trigger_scope is set")
+        ep.trigger_scope = body.trigger_scope
+        ep.trigger_scope_id = body.trigger_scope_id
+    await repo.update(ep)
+    return _ep_resp(ep)
+
+
+@router.delete("/organizations/{org_id}/endpoints/{ep_id}", status_code=204)
+async def delete_endpoint(
+    org_id: UUID,
+    ep_id: UUID,
+    repo: MongoWebhookEndpointRepository = Depends(_ep_repo),
+    user: User = Depends(get_current_user),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    await _require_admin(org_id, user, authz)
+    ep = await repo.find_by_id(ep_id)
+    if ep is None or ep.org_id != org_id:
+        raise HTTPException(404)
+    await repo.delete(ep_id)
+
+
+# --- Deliveries ---
+
+
+@router.get(
+    "/organizations/{org_id}/endpoints/{ep_id}/deliveries", response_model=list[DeliveryResponse]
+)
+async def list_deliveries(
+    org_id: UUID,
+    ep_id: UUID,
+    repo: MongoWebhookEndpointRepository = Depends(_ep_repo),
+    del_repo: MongoDeliveryRepository = Depends(_del_repo),
+    user: User = Depends(get_current_user),
+    authz: AuthorizationService = Depends(get_authz),
+):
+    await _require_admin(org_id, user, authz)
+    ep = await repo.find_by_id(ep_id)
+    if ep is None or ep.org_id != org_id:
+        raise HTTPException(404)
+    deliveries = await del_repo.find_by_endpoint(ep_id)
+    return [
+        DeliveryResponse(
+            id=d.id,
+            endpoint_id=d.endpoint_id,
+            event_type=d.event_type,
+            payload_sent=d.payload_sent,
+            status=d.status,
+            response_code=d.response_code,
+            error=d.error,
+            created_at=d.created_at.isoformat(),
+        )
+        for d in deliveries
+    ]
+
+
+# --- Transformer test (dry-run) ---
+
+
+@router.post("/transformer/test", response_model=TransformerTestResponse)
+async def test_transformer(
+    body: TransformerTestBody,
+    _user: User = Depends(get_current_user),
+):
+    result, error, stdout = run_transformer(body.transformer, body.payload)
+    return TransformerTestResponse(result=result, error=error, stdout=stdout)

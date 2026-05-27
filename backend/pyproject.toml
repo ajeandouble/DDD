@@ -1,0 +1,41 @@
+[project]
+name = "ddd-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "bcrypt>=5.0.0",
+    "casbin>=1.36.0",
+    "croniter>=6.2.2",
+    "fastapi[standard]>=0.115.0",
+    "faster-whisper>=1.2.1",
+    "httpx>=0.28.1",
+    "motor>=3.7.1",
+    "pyjwt>=2.12.1",
+    "python-dotenv>=1.0.0",
+    "restrictedpython>=8.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.mypy]
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+module = ["casbin", "casbin.*"]
+ignore_missing_imports = true
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "black>=26.3.1",
+    "motor-stubs>=1.7.1",
+    "types-croniter>=6.2.2.20260518",
+]

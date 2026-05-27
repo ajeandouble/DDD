@@ -1,0 +1,42 @@
+{
+  "name": "ddd-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "format": "prettier --write src/",
+    "format:check": "prettier --check src/"
+  },
+  "dependencies": {
+    "@mantine/core": "^9.2.1",
+    "@mantine/dropzone": "^9.2.1",
+    "@mantine/hooks": "^9.2.1",
+    "@mantine/notifications": "^9.2.1",
+    "@tabler/icons-react": "^3.44.0",
+    "@tanstack/react-query": "^5.100.10",
+    "browser-image-compression": "^2.0.2",
+    "cronstrue": "^3.14.0",
+    "i18next": "^26.2.0",
+    "ky": "^2.0.2",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-i18next": "^17.0.8",
+    "react-router-dom": "^7.15.1",
+    "wavesurfer.js": "^7.12.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tanstack/react-query-devtools": "^5.100.10",
+    "@types/node": "^25.8.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/react-router-dom": "^5.3.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.13"
+  }
+}
