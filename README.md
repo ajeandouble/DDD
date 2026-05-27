@@ -4,6 +4,43 @@
 
 A toy project for practising **Domain-Driven Design** in a single-runtime backend. Seven bounded contexts live in the same FastAPI process and communicate via in-process domain events.
 
+## How to run
+
+**Prerequisites:** MongoDB running locally on port 27017.
+
+```bash
+# 1. Install all dependencies
+make install
+
+# 2. Seed the database with fixture users and sample data
+cd backend && uv run python scripts/seed_dev.py
+
+# 3. Start backend + frontend concurrently
+make dev # might not work because of my lazyness in which case run them independently with `make dev-backend` and `make dev-frontend`
+```
+
+The backend starts at `http://localhost:8000` and the frontend at `http://localhost:5173`.
+
+### Seed accounts
+
+All seeded accounts share the password **`abcd1234`**.
+
+| Email                | Role                             |
+| -------------------- | -------------------------------- |
+| `superadmin@ddd.dev` | Superadmin — bypasses all checks |
+| `alice@ddd.dev`      | Org owner → admin at org (auto)  |
+| `bob@ddd.dev`        | Supervisor at org                |
+| `carol@ddd.dev`      | Editor at project                |
+| `dave@ddd.dev`       | Viewer at campaign               |
+| `eve@ddd.dev`        | Supervisor at subproject         |
+| `frank@ddd.dev`      | Editor at org                    |
+| `grace@ddd.dev`      | Viewer at project                |
+| `henry@ddd.dev`      | Editor at campaign               |
+| `ivan@ddd.dev`       | Viewer at org                    |
+| `judy@ddd.dev`       | No role — locked out of org      |
+
+The seed creates one organisation (**Acme Corp**) with a full project → subproject → campaign hierarchy and 100 sample conversations.
+
 ## Stack
 
 | Layer      | Tech                                                    |
@@ -77,24 +114,18 @@ User uploads media
 ## IAM integration
 
 Other contexts call the IAM application service to authorize actions — they never read the IAM database.
-Full design: `~/.claude/projects/-Users-ajean-dev-DDD/IAM.md`
+Other contexts call the IAM application service to authorize actions — they never read the IAM database directly.
 
-## Running
+## Makefile reference
 
 ```bash
-make install   # install all deps
-make dev       # start backend + frontend concurrently
-make format    # black + prettier
-make build     # production frontend build
+make install        # install all deps (backend + frontend)
+make dev            # start backend + frontend concurrently
+make dev-backend    # backend only
+make dev-frontend   # frontend only
+make format         # black + prettier
+make build          # production frontend build
 ```
-
-## ROADMAP
-
-**After completing any task, update `/Users/ajean/.claude/projects/-Users-ajean-dev-DDD/ROADMAP.md`** — mark finished items `- [x]` and keep the file accurate. The ROADMAP lives outside the repo (it is in `.gitignore`).
-
-## Subagents
-
-When spawning agents (Explore, general-purpose, etc.) for lightweight tasks (file lookups, searches, simple edits), always pass `model: "haiku"` to minimize cost. Only use the default (Sonnet) or `model: "opus"` for tasks that genuinely need stronger reasoning.
 
 ## What to avoid
 
