@@ -113,7 +113,6 @@ User uploads media
 
 ## IAM integration
 
-Other contexts call the IAM application service to authorize actions — they never read the IAM database.
 Other contexts call the IAM application service to authorize actions — they never read the IAM database directly.
 
 ## Makefile reference

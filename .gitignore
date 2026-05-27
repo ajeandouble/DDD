@@ -2,3 +2,6 @@
 .env.local
 .DS_Store
 ROADMAP.md
+frontend/.vite/
+frontend/node_modules/
+frontend/dist/
