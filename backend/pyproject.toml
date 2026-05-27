@@ -22,6 +22,14 @@ package = false
 line-length = 100
 target-version = ["py312"]
 
+[tool.mypy]
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+module = ["casbin", "casbin.*"]
+ignore_missing_imports = true
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
