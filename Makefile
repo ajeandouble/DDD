@@ -1,15 +1,15 @@
 .PHONY: dev dev-backend dev-frontend build install \
         format format-check lint clean
 
-# ── combined ──────────────────────────────────────────────────────────────────
 dev:
 	@set -e; \
 	trap 'kill 0; exit 0' INT TERM EXIT; \
 	$(MAKE) dev-backend & \
+	echo "Waiting for backend..."; \
+	until curl -sf http://localhost:8000/health >/dev/null 2>&1; do sleep 1; done; \
 	$(MAKE) dev-frontend & \
 	wait
 
-# ── backend ───────────────────────────────────────────────────────────────────
 dev-backend:
 	cd backend && uv run fastapi dev src/main.py
 
@@ -22,7 +22,6 @@ format-backend:
 format-check-backend:
 	cd backend && uv run black --check src/
 
-# ── frontend ──────────────────────────────────────────────────────────────────
 dev-frontend:
 	cd frontend && npm run dev
 
